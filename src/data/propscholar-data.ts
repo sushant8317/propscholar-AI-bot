@@ -17,55 +17,6 @@ const HELP_ARTICLES = [
     url: "https://help.propscholar.com/article/no-consistency-model-2-step",
     category: "Evaluations",
     content: `PropScholar Plus is a 2-step evaluation with NO consistency rule. PHASE 1 (Examinee Phase): Profit target 8%, leverage 1:100, no time limit. PHASE 2 (Scholar Phase): Profit target 5%, leverage 1:100, no time limit. RISK RULES: Maximum Loss Limit is 8% of initial account size (hard breach). Example: $100,000 account cannot drop below $92,000. Daily Loss Limit is 4% based on higher value between starting equity or balance (hard breach, resets daily at 00:00 UTC). Example: Day starts with $105,000 balance and $107,000 equity, equity cannot fall below $102,720 that day. GENERAL RULES: No lot limit. Minimum 3 profitable days required. Weekend holding allowed. No news trading restrictions. No time limit on phases. 14 days inactivity limit. Average holding time minimum 2 minutes (soft breach). Copy trading between two PropScholar accounts not allowed. Tick scalping, glitch exploitation, and insider signals prohibited. KEY DIFFERENCE: This model has NO consistency rule and includes minimum profitable days requirement with average holding time soft breach.`
-  },
-
-  {
-    title: "2-Step Evaluation Rules",
-    url: "https://help.propscholar.com/2-step-evaluation",
-    category: "Evaluations",
-    content: `Our 2-step evaluation requires passing two phases. Phase 1: Hit profit target (8-10%) without breaking rules. Phase 2: Hit smaller profit target (5%) and maintain consistency. Rules include max daily loss (5%), max total loss (10%), and consistency rule (no day > 45% of total profit). No time limit on either phase.`
-  },
-  {
-    title: "Consistency Rule Explained",
-    url: "https://help.propscholar.com/consistency-rule",
-    category: "Evaluations",
-    content: `The consistency rule requires no single trading day can exceed 45% of your total profit target. Example: $5,000 account with 8% target ($400) means no day can have more than $180 profit. This ensures steady trading habits. Applies to Phase 1 and Phase 2 of evaluations.`
-  },
-  {
-    title: "Payment Methods",
-    url: "https://help.propscholar.com/payment-methods",
-    category: "Billing",
-    content: `We accept PayPal, PhonePe (UPI for India), Paytm, and credit/debit cards. Indian traders can pay via UPI which is instant. International traders use PayPal or card. No crypto payments currently. Refunds processed within 5-7 business days.`
-  },
-  {
-    title: "Scholarship Reward System",
-    url: "https://help.propscholar.com/scholarship-reward",
-    category: "Getting Started",
-    content: `After passing evaluation, you receive a scholarship reward based on your account size. Use it to purchase any prop firm challenge from our marketplace at discounted rates. The scholarship is yours to keep - you can buy challenges, trading tools, or withdraw it. No profit split with PropScholar on the scholarship amount.`
-  },
-  {
-    title: "PropScholar Plus - 2 Step",
-    url: "https://help.propscholar.com/propscholar-plus",
-    category: "Evaluations",
-    content: `PropScholar Plus is our premium 2-step evaluation with more relaxed rules. Features include: 10% profit target Phase 1, 5% Phase 2, 6% max daily loss (vs 5% standard), 12% max total loss (vs 10% standard), and longer trading hours. Costs slightly more but easier to pass for aggressive traders.`
-  },
-  {
-    title: "Trading Platform Support",
-    url: "https://help.propscholar.com/platforms",
-    category: "Technical",
-    content: `We support MT4, MT5, and cTrader platforms. Most evaluations use MT5 for best execution. You can use Expert Advisors (EAs), bots, and any trading strategy. No platform fees. Login credentials sent within 24 hours of purchase via email and Discord.`
-  },
-  {
-    title: "Refund Policy",
-    url: "https://help.propscholar.com/refund-policy",
-    category: "Billing",
-    content: `Refunds available within 14 days if you haven't started trading. Once you place a trade, evaluations are non-refundable. Failed evaluations are not refundable - you can repurchase at discounted retry rates. Contact support@propscholar.com for refund requests.`
-  },
-  {
-    title: "Account Delivery Time",
-    url: "https://help.propscholar.com/account-delivery",
-    category: "Technical",
-    content: `Evaluation accounts delivered within 24-48 hours via email. Check spam folder. Discord community members get priority delivery (usually within 12 hours). Credentials include MT5 login, password, and server details. If not received in 48 hours, open a support ticket.`
   }
   // ADD MORE ARTICLES HERE as you get them
 ];
