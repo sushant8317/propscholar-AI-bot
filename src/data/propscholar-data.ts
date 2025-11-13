@@ -7,7 +7,7 @@ import * as cheerio from 'cheerio';
 const HELP_ARTICLES = [
   {
     title: "Understanding the PropScholar Model",
-    url: "https://help.propscholar.com/propscholar-model",
+    url: "https://help.propscholar.com/propscholars-model",
     category: "Getting Started",
     content: `PropScholar is a skill-evaluation platform offering simulated trading challenges on demo accounts only. No real-money trading, no brokerage services, no financial advice. Here's how it works: Select an evaluation (e.g., Maven 2K 2-Step normally costs $19), pay a small entry fee ($5 instead of $19), and pass our evaluation to receive a direct scholarship payout of $19 via UPI, crypto, or bank transfer. If you fail, you only lose the small entry fee. If you pass, you earn 4x your entry fee as a scholarship within 4 hours - no additional phases. We're not a broker and don't handle real money, provide investment advice, or resell prop firm accounts. All challenges are conducted in a virtual environment using demo accounts. Rewards are performance-based scholarships paid directly to you.`
   },
