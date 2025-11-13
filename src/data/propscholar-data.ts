@@ -330,6 +330,5 @@ export {
   fetchPageContent, 
   fetchAllPages,
   HELP_ARTICLES,
-  STATIC_DATA,
-  cleanBotResponse // <-- Use this in your Discord message dispatcher!
+  STATIC_DATA, 
 };
