@@ -1,12 +1,83 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 
-// Static fallback data
+// ========================================
+// MANUAL KNOWLEDGE BASE - Help Center Articles
+// ========================================
+const HELP_ARTICLES = [
+  {
+    title: "Understanding the PropScholar Model",
+    url: "https://help.propscholar.com/propscholar-model",
+    category: "Getting Started",
+    content: `PropScholar is a skill-evaluation platform offering simulated trading challenges on demo accounts only. No real-money trading, no brokerage services, no financial advice. Here's how it works: Select an evaluation (e.g., Maven 2K 2-Step normally costs $19), pay a small entry fee ($5 instead of $19), and pass our evaluation to receive a direct scholarship payout of $19 via UPI, crypto, or bank transfer. If you fail, you only lose the small entry fee. If you pass, you earn 4x your entry fee as a scholarship within 4 hours - no additional phases. We're not a broker and don't handle real money, provide investment advice, or resell prop firm accounts. All challenges are conducted in a virtual environment using demo accounts. Rewards are performance-based scholarships paid directly to you.`
+  },
+
+  {
+    title: "PropScholar Plus - 2 Step",
+    url: "https://help.propscholar.com/article/no-consistency-model-2-step",
+    category: "Evaluations",
+    content: `PropScholar Plus is a 2-step evaluation with NO consistency rule. PHASE 1 (Examinee Phase): Profit target 8%, leverage 1:100, no time limit. PHASE 2 (Scholar Phase): Profit target 5%, leverage 1:100, no time limit. RISK RULES: Maximum Loss Limit is 8% of initial account size (hard breach). Example: $100,000 account cannot drop below $92,000. Daily Loss Limit is 4% based on higher value between starting equity or balance (hard breach, resets daily at 00:00 UTC). Example: Day starts with $105,000 balance and $107,000 equity, equity cannot fall below $102,720 that day. GENERAL RULES: No lot limit. Minimum 3 profitable days required. Weekend holding allowed. No news trading restrictions. No time limit on phases. 14 days inactivity limit. Average holding time minimum 2 minutes (soft breach). Copy trading between two PropScholar accounts not allowed. Tick scalping, glitch exploitation, and insider signals prohibited. KEY DIFFERENCE: This model has NO consistency rule and includes minimum profitable days requirement with average holding time soft breach.`
+  },
+
+  {
+    title: "2-Step Evaluation Rules",
+    url: "https://help.propscholar.com/2-step-evaluation",
+    category: "Evaluations",
+    content: `Our 2-step evaluation requires passing two phases. Phase 1: Hit profit target (8-10%) without breaking rules. Phase 2: Hit smaller profit target (5%) and maintain consistency. Rules include max daily loss (5%), max total loss (10%), and consistency rule (no day > 45% of total profit). No time limit on either phase.`
+  },
+  {
+    title: "Consistency Rule Explained",
+    url: "https://help.propscholar.com/consistency-rule",
+    category: "Evaluations",
+    content: `The consistency rule requires no single trading day can exceed 45% of your total profit target. Example: $5,000 account with 8% target ($400) means no day can have more than $180 profit. This ensures steady trading habits. Applies to Phase 1 and Phase 2 of evaluations.`
+  },
+  {
+    title: "Payment Methods",
+    url: "https://help.propscholar.com/payment-methods",
+    category: "Billing",
+    content: `We accept PayPal, PhonePe (UPI for India), Paytm, and credit/debit cards. Indian traders can pay via UPI which is instant. International traders use PayPal or card. No crypto payments currently. Refunds processed within 5-7 business days.`
+  },
+  {
+    title: "Scholarship Reward System",
+    url: "https://help.propscholar.com/scholarship-reward",
+    category: "Getting Started",
+    content: `After passing evaluation, you receive a scholarship reward based on your account size. Use it to purchase any prop firm challenge from our marketplace at discounted rates. The scholarship is yours to keep - you can buy challenges, trading tools, or withdraw it. No profit split with PropScholar on the scholarship amount.`
+  },
+  {
+    title: "PropScholar Plus - 2 Step",
+    url: "https://help.propscholar.com/propscholar-plus",
+    category: "Evaluations",
+    content: `PropScholar Plus is our premium 2-step evaluation with more relaxed rules. Features include: 10% profit target Phase 1, 5% Phase 2, 6% max daily loss (vs 5% standard), 12% max total loss (vs 10% standard), and longer trading hours. Costs slightly more but easier to pass for aggressive traders.`
+  },
+  {
+    title: "Trading Platform Support",
+    url: "https://help.propscholar.com/platforms",
+    category: "Technical",
+    content: `We support MT4, MT5, and cTrader platforms. Most evaluations use MT5 for best execution. You can use Expert Advisors (EAs), bots, and any trading strategy. No platform fees. Login credentials sent within 24 hours of purchase via email and Discord.`
+  },
+  {
+    title: "Refund Policy",
+    url: "https://help.propscholar.com/refund-policy",
+    category: "Billing",
+    content: `Refunds available within 14 days if you haven't started trading. Once you place a trade, evaluations are non-refundable. Failed evaluations are not refundable - you can repurchase at discounted retry rates. Contact support@propscholar.com for refund requests.`
+  },
+  {
+    title: "Account Delivery Time",
+    url: "https://help.propscholar.com/account-delivery",
+    category: "Technical",
+    content: `Evaluation accounts delivered within 24-48 hours via email. Check spam folder. Discord community members get priority delivery (usually within 12 hours). Credentials include MT5 login, password, and server details. If not received in 48 hours, open a support ticket.`
+  }
+  // ADD MORE ARTICLES HERE as you get them
+];
+
+// ========================================
+// STATIC FALLBACK DATA
+// ========================================
 const STATIC_DATA = {
-  about: "PropScholar is India's most affordable prop trading firm. Start trading with our capital from just ₹5! We provide trading capital, tools, and education so anyone can become a professional trader.",
+  about: "PropScholar is India's most affordable prop trading firm. Start trading with our capital from just 5! We provide trading capital, tools, and education so anyone can become a professional trader.",
   
   features: [
-    "Start with just ₹5 - lowest in India!",
+    "Start with just $5 - lowest in India!",
     "Lightning-fast 4-hour payouts (not 14 days like competitors)",
     "Zero-spread accounts for better execution",
     "Free demo accounts forever",
@@ -14,7 +85,7 @@ const STATIC_DATA = {
     "Instant breach alerts via Discord",
     "EAs & bots fully allowed",
     "No hidden fees ever",
-    "80% profit share - keep ₹80 of every ₹100 you make"
+    "80% profit share - keep $80 of every $100 you make"
   ],
   
   targetMarkets: [
@@ -23,13 +94,18 @@ const STATIC_DATA = {
     "Small prop firms seeking partnerships"
   ],
   
-  valueProposition: "Trade with our capital, keep 80% profits. Start from ₹5!"
+  valueProposition: "Trade with our capital, keep 80% profits. Start from $5!"
 };
 
-// URLs
-const SITEMAP_URL = 'https://www.propscholar.com/sitemap.xml';
-const HELP_SITEMAP_URL = 'https://help.propscholar.com/sitemap.xml';
-const API_ENDPOINT = 'https://www.propscholar.com/api/bot-data';
+// ========================================
+// INTERFACES
+// ========================================
+interface Article {
+  title: string;
+  url: string;
+  category: string;
+  content: string;
+}
 
 interface PropScholarAPIData {
   pricing?: string[];
@@ -44,47 +120,35 @@ interface PageContent {
   content: string;
 }
 
-// Fetch and parse sitemap
+// ========================================
+// CONFIGURATION
+// ========================================
+const SITEMAP_URL = 'https://www.propscholar.com/sitemap.xml';
+const API_ENDPOINT = 'https://www.propscholar.com/api/bot-data';
+
+// ========================================
+// WEBSITE SCRAPING FUNCTIONS (ORIGINAL)
+// ========================================
 async function fetchSitemap(): Promise<string[]> {
   try {
     console.log('📡 Fetching sitemap from PropScholar.com...');
-// Fetch from MAIN website sitemap
-    console.log(`🌍 Fetching sitemap from PropScholar.com...`);
-    const response1 = await axios.get(SITEMAP_URL, {
+    const response = await axios.get(SITEMAP_URL, { 
       timeout: 8000,
       headers: { 'User-Agent': 'PropScholar-Discord-Bot' }
     });
-    const $1 = cheerio.load(response1.data, { xmlMode: true });
-    const urls1: string[] = [];
-    $1('url loc').each((i, elem) => {
-      const url = $1(elem).text();
-      if (url && !url.includes('.xml')) {
-        urls1.push(url);
-      }
-    });
-    console.log(`✅ Found ${urls1.length} pages in main sitemap`);
-
-    // Fetch from HELP docs sitemap
-    console.log(`📚 Fetching sitemap from help.propscholar.com...`);
-    const response2 = await axios.get(HELP_SITEMAP_URL, {
-      timeout: 8000,
-      headers: { 'User-Agent': 'PropScholar-Discord-Bot' }
-    });
-    const $2 = cheerio.load(response2.data, { xmlMode: true });
-    const urls2: string[] = [];
-    $2('url loc').each((i, elem) => {
-      const url = $2(elem).text();
-      if (url && !url.includes('.xml')) {
-        urls2.push(url);
-      }
-    });
-    console.log(`✅ Found ${urls2.length} pages in help sitemap`);
-
-    // Combine all URLs
-    const allUrls = [...urls1, ...urls2];
-    console.log(`📦 Total pages to scrape: ${allUrls.length}`);
     
-    return allUrls.slice(0, 40); // Increased limit to 40 pages for both sites
+    const $ = cheerio.load(response.data, { xmlMode: true });
+    const urls: string[] = [];
+    
+    $('url loc').each((i, elem) => {
+      const url = $(elem).text();
+      if (url && !url.includes('.xml')) {
+        urls.push(url);
+      }
+    });
+    
+    console.log(`✅ Found ${urls.length} pages in sitemap`);
+    return urls.slice(0, 20);
   } catch (error) {
     console.log('⚠️ Could not fetch sitemap, using fallback');
     return [
@@ -96,7 +160,6 @@ async function fetchSitemap(): Promise<string[]> {
   }
 }
 
-// Fetch content from a single page
 async function fetchPageContent(url: string): Promise<PageContent | null> {
   try {
     const response = await axios.get(url, {
@@ -105,16 +168,13 @@ async function fetchPageContent(url: string): Promise<PageContent | null> {
     });
     
     const $ = cheerio.load(response.data);
-    
-    // Extract title
     const title = $('title').text() || $('h1').first().text() || '';
     
-    // Extract main content (remove scripts, styles, nav, footer)
     $('script, style, nav, footer, header').remove();
     const content = $('body').text()
       .replace(/\s+/g, ' ')
       .trim()
-      .substring(0, 1000); // Limit to 1000 chars per page
+      .substring(0, 1000);
     
     return { url, title, content };
   } catch (error) {
@@ -123,14 +183,12 @@ async function fetchPageContent(url: string): Promise<PageContent | null> {
   }
 }
 
-// Fetch all pages from sitemap
 async function fetchAllPages(): Promise<PageContent[]> {
   const urls = await fetchSitemap();
   console.log(`📄 Fetching content from ${urls.length} pages...`);
   
-const pages: PageContent[] = [];
+  const pages: PageContent[] = [];
   
-  // Traverse pages sequentially (one by one)
   for (let i = 0; i < urls.length; i++) {
     const url = urls[i];
     console.log(`📄 [${i + 1}/${urls.length}] Fetching: ${url}`);
@@ -152,7 +210,6 @@ const pages: PageContent[] = [];
   return pages;
 }
 
-// Fetch live data from API
 async function fetchLiveData(): Promise<PropScholarAPIData | null> {
   try {
     console.log('📡 Fetching live API data...');
@@ -169,29 +226,83 @@ async function fetchLiveData(): Promise<PropScholarAPIData | null> {
   }
 }
 
-// Build comprehensive system prompt
+// ========================================
+// MAIN FUNCTION - Build System Prompt
+// ========================================
 export async function getPropScholarData(): Promise<string> {
-  // Fetch data from all sources in parallel
+  // Fetch live data from website and API
   const [liveData, pages] = await Promise.all([
     fetchLiveData(),
     fetchAllPages()
   ]);
   
-  let prompt = `You are a friendly AI support assistant for PropScholar, India's most affordable prop trading firm. Be conversational, helpful, and enthusiastic! Use emojis when appropriate.\n\n`;
+  // Group help articles by category
+  const categorizedArticles = HELP_ARTICLES.reduce((acc, article) => {
+    const cat = article.category;
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(article);
+    return acc;
+  }, {} as Record<string, Article[]>);
   
-  // Add basic info
-  prompt += `🎯 ABOUT PROPSCHOLAR:\n${STATIC_DATA.about}\n\n`;
+  let prompt = `You are a professional support assistant for PropScholar. Provide direct, accurate, and helpful answers.\n\n`;
   
-  // Add static features
-  prompt += `⭐ KEY FEATURES:\n`;
+  // ========================================
+  // RESPONSE GUIDELINES
+  // ========================================
+  prompt += `## RESPONSE RULES:\n`;
+  prompt += `1. Give short, direct answers (1-3 sentences)\n`;
+  prompt += `2. Be professional and helpful - NO emojis\n`;
+  prompt += `3. Always cite sources: "Source: [URL]"\n`;
+  prompt += `4. If info not in knowledge base: "I don't have that information. Visit help.propscholar.com or contact support."\n`;
+  prompt += `5. Never make up information\n\n`;
+  
+  // ========================================
+  // EXAMPLE RESPONSES
+  // ========================================
+  prompt += `## CORRECT RESPONSE EXAMPLES:\n\n`;
+  
+  prompt += `User: "What is the consistency rule?"\n`;
+  prompt += `Bot: "No single trading day can exceed 45% of your total profit target. For example, on a $5,000 account with an 8% ($400) target, no day can exceed $180 profit. Source: https://help.propscholar.com/consistency-rule"\n\n`;
+  
+  prompt += `User: "How do I pay?"\n`;
+  prompt += `Bot: "We accept PayPal, PhonePe (UPI), Paytm, and credit/debit cards. Indian traders can use instant UPI payment. Source: https://help.propscholar.com/payment-methods"\n\n`;
+  
+  prompt += `User: "When do I get my account?"\n`;
+  prompt += `Bot: "Evaluation accounts are delivered within 24-48 hours via email. Discord members get priority delivery within 12 hours. Source: https://help.propscholar.com/account-delivery"\n\n`;
+  
+  prompt += `User: "Can I use EAs?"\n`;
+  prompt += `Bot: "Yes, Expert Advisors (EAs) and bots are fully allowed on all platforms. Source: https://help.propscholar.com/platforms"\n\n`;
+  
+  // ========================================
+  // HELP CENTER KNOWLEDGE BASE (PRIMARY SOURCE)
+  // ========================================
+  prompt += `## HELP CENTER KNOWLEDGE BASE (PRIMARY SOURCE):\n\n`;
+  
+  Object.entries(categorizedArticles).forEach(([category, articles]) => {
+    prompt += `### ${category}\n\n`;
+    articles.forEach(article => {
+      prompt += `Title: ${article.title}\n`;
+      prompt += `URL: ${article.url}\n`;
+      prompt += `Content: ${article.content}\n\n`;
+    });
+  });
+  
+  // ========================================
+  // STATIC COMPANY INFO (SECONDARY SOURCE)
+  // ========================================
+  prompt += `## COMPANY OVERVIEW:\n${STATIC_DATA.about}\n\n`;
+  
+  prompt += `## KEY FEATURES:\n`;
   STATIC_DATA.features.forEach(feature => {
     prompt += `• ${feature}\n`;
   });
   prompt += `\n`;
   
-  // Add live API data if available
+  // ========================================
+  // LIVE DATA (if available)
+  // ========================================
   if (liveData?.pricing) {
-    prompt += `💰 CURRENT PRICING:\n`;
+    prompt += `## CURRENT PRICING:\n`;
     liveData.pricing.forEach((price: string) => {
       prompt += `• ${price}\n`;
     });
@@ -199,48 +310,71 @@ export async function getPropScholarData(): Promise<string> {
   }
   
   if (liveData?.updates) {
-    prompt += `🔥 LATEST UPDATES:\n`;
+    prompt += `## LATEST UPDATES:\n`;
     liveData.updates.forEach((update: string) => {
       prompt += `• ${update}\n`;
     });
     prompt += `\n`;
   }
   
-  // Add content from all website pages
+  // ========================================
+  // WEBSITE CONTENT (ADDITIONAL CONTEXT)
+  // ========================================
   if (pages.length > 0) {
-    prompt += `📚 WEBSITE CONTENT (from ${pages.length} pages):\n\n`;
+    prompt += `## ADDITIONAL WEBSITE CONTENT (from ${pages.length} pages):\n\n`;
     
     pages.forEach(page => {
       prompt += `Page: ${page.title}\n`;
       prompt += `URL: ${page.url}\n`;
-      prompt += `Content: ${page.content.substring(0, 500)}...\n\n`;
+      prompt += `Content: ${page.content.substring(0, 400)}...\n\n`;
     });
   }
   
-  // Add target markets
-  prompt += `🌍 TARGET MARKETS:\n`;
-  STATIC_DATA.targetMarkets.forEach(market => {
-    prompt += `• ${market}\n`;
-  });
-  prompt += `\n`;
+  // ========================================
+  // CITATION REQUIREMENTS
+  // ========================================
+  prompt += `## CITATION FORMAT:\n`;
+  prompt += `Always end responses with: "Source: [exact URL]"\n`;
+  prompt += `For multiple sources: "Sources: [URL1], [URL2]"\n`;
+  prompt += `Prioritize help.propscholar.com URLs when available\n\n`;
   
-  // Add value proposition
-  prompt += `💎 VALUE PROPOSITION:\n${STATIC_DATA.valueProposition}\n\n`;
+  // ========================================
+  // EDGE CASES
+  // ========================================
+  prompt += `## HANDLE THESE SITUATIONS:\n`;
+  prompt += `- Account-specific: "Contact support@propscholar.com with your account details."\n`;
+  prompt += `- Technical errors: "Open a support ticket at help.propscholar.com with error details."\n`;
+  prompt += `- Pricing: "Visit propscholar.com/pricing for current rates."\n`;
+  prompt += `- Unknown: "I don't have that information. Check help.propscholar.com or contact support."\n\n`;
   
-  // Add bot instructions
-  prompt += `🤖 YOUR ROLE:\nAnswer questions about PropScholar professionally and helpfully. When traders ask:\n`;
-  prompt += `1. Be conversational and friendly\n`;
-  prompt += `2. Emphasize the ₹5 entry point and affordability\n`;
-  prompt += `3. Mention the 4-hour payout guarantee\n`;
-  prompt += `4. Encourage them to start with demo account\n`;
-  prompt += `5. Invite them to join Discord community\n`;
-  prompt += `6. Use emojis to be engaging\n`;
-  prompt += `7. If you don't know something specific, direct them to www.propscholar.com or Discord support\n\n`;
-  
-  prompt += `Example tone: "Hey! 🎯 Great question! Yes, you can use EAs on PropScholar! Our ₹5 starter account is perfect for testing..."\n`;
+  prompt += `Remember: Short, professional, cite sources, no emojis.`;
   
   return prompt;
 }
 
-// Export for testing
-export { fetchSitemap, fetchPageContent, fetchAllPages };
+// ========================================
+// HELPER FUNCTIONS
+// ========================================
+export function searchArticles(query: string): Article[] {
+  const lowerQuery = query.toLowerCase();
+  return HELP_ARTICLES.filter(article => 
+    article.title.toLowerCase().includes(lowerQuery) ||
+    article.content.toLowerCase().includes(lowerQuery) ||
+    article.category.toLowerCase().includes(lowerQuery)
+  );
+}
+
+export function getAllArticles(): Article[] {
+  return HELP_ARTICLES;
+}
+
+// ========================================
+// EXPORTS
+// ========================================
+export { 
+  fetchSitemap, 
+  fetchPageContent, 
+  fetchAllPages,
+  HELP_ARTICLES,
+  STATIC_DATA
+};
