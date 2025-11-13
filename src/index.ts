@@ -148,3 +148,14 @@ client.on('messageReactionAdd', async (
 connectDB().then(() => {
   client.login(process.env.DISCORD_TOKEN);
 });
+
+// Create a simple HTTP server for Render health checks
+const PORT = process.env.PORT || 3000;
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('Discord bot is running!');
+});
+
+server.listen(PORT, () => {
+  console.log(`🌐 HTTP server listening on port ${PORT}`);
+});
