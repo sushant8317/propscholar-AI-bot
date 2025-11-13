@@ -81,12 +81,6 @@ const HELP_ARTICLES = [
   category: "Evaluation Rules",
   content: `If you breach any trading objective, you will receive an email by 00:00 UTC next day. All open trades will be closed immediately, and any active limit or stop orders will be canceled. Your account credentials will no longer be active. BREACH EMAIL DETAILS: You will receive an email detailing the exact reason for breach, including which rule was violated, when it occurred, and how it impacted your account. This ensures full transparency and helps you understand what went wrong. Account becomes inactive after breach and cannot be recovered. All trading activity stops immediately once breach is detected.`
   },
-
-
-
-
-
-  // ADD MORE ARTICLES HERE as you get them
 ];
 
 // ========================================
@@ -322,13 +316,20 @@ export function getAllArticles(): Article[] {
   return HELP_ARTICLES;
 }
 
+// Clean URLs in final bot output before sending!
+export function cleanBotResponse(text: string) {
+  return text.replace(/(%7D|\})+/g, ""); // Removes any stray %7D or }
+}
+
 // ========================================
 // EXPORTS
 // ========================================
+
 export { 
   fetchSitemap, 
   fetchPageContent, 
   fetchAllPages,
   HELP_ARTICLES,
-  STATIC_DATA
+  STATIC_DATA,
+  cleanBotResponse // <-- Use this in your Discord message dispatcher!
 };
