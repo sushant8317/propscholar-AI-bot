@@ -17,7 +17,30 @@ const HELP_ARTICLES = [
     url: "https://help.propscholar.com/article/no-consistency-model-2-step",
     category: "Evaluations",
     content: `PropScholar Plus is a 2-step evaluation with NO consistency rule. PHASE 1 (Examinee Phase): Profit target 8%, leverage 1:100, no time limit. PHASE 2 (Scholar Phase): Profit target 5%, leverage 1:100, no time limit. RISK RULES: Maximum Loss Limit is 8% of initial account size (hard breach). Example: $100,000 account cannot drop below $92,000. Daily Loss Limit is 4% based on higher value between starting equity or balance (hard breach, resets daily at 00:00 UTC). Example: Day starts with $105,000 balance and $107,000 equity, equity cannot fall below $102,720 that day. GENERAL RULES: No lot limit. Minimum 3 profitable days required. Weekend holding allowed. No news trading restrictions. No time limit on phases. 14 days inactivity limit. Average holding time minimum 2 minutes (soft breach). Copy trading between two PropScholar accounts not allowed. Tick scalping, glitch exploitation, and insider signals prohibited. KEY DIFFERENCE: This model has NO consistency rule and includes minimum profitable days requirement with average holding time soft breach.`
-  }
+  },
+
+  {
+  title: "PropScholar Plus - 1 Step",
+  url: "https://help.propscholar.com/article/no-consistency-1-step",
+  category: "Evaluations",
+  content: `PropScholar Plus 1-Step is a single-phase evaluation with NO consistency rule. PHASE 1 (Scholar Phase - only phase): Profit target 10%, leverage 1:50, no time limit. RISK RULES: Maximum Loss Limit is 6% of initial account size (hard breach). Example: $100,000 account cannot drop below $94,000. Daily Loss Limit is 3% based on higher value between starting equity or balance (hard breach, resets daily at 00:00 UTC). Example: Day starts with $105,000 balance and $107,000 equity, equity cannot fall below $103,790 that day. GENERAL RULES: No lot limit. Minimum 3 profitable days required. Weekend holding allowed. No news trading restrictions. No time limit. 14 days inactivity limit. Average holding time minimum 2 minutes (soft breach). Copy trading between two PropScholar accounts not allowed. Tick scalping, glitch exploitation, and insider signals prohibited. KEY DIFFERENCE: This is a 1-step model (complete in single phase) with NO consistency rule, minimum profitable days requirement, and average holding time soft breach.`
+  },
+
+  {
+  title: "PropScholar 1 Step (Standard)",
+  url: "https://help.propscholar.com/article/1-step-evaluation",
+  category: "Evaluations",
+  content: `PropScholar 1-Step STANDARD model (NOT Plus) is a single-phase evaluation WITH consistency rule. PHASE 1 (Scholar Phase - only phase): Profit target 10%, leverage 1:100, no time limit. RISK RULES: Maximum Loss Limit is 6% of initial account size (hard breach). Example: $100,000 account cannot drop below $94,000. Daily Loss Limit is 3% based on higher value between starting equity or balance (hard breach, resets daily at 00:00 UTC). Example 1: Day starts with $105,000 balance and $107,000 equity, equity cannot fall below $103,790 that day. Example 2: Day starts with $100,000 balance and $99,000 equity, equity cannot fall below $97,000 that day. GENERAL RULES: No lot limit. Weekend holding allowed. No news trading restrictions. No time limit. Consistency Rule REQUIRED: No single day can exceed 45% of total profit (14 day consistency period). Copy trading between two PropScholar accounts not allowed. Tick scalping, glitch exploitation, and insider signals prohibited. KEY DIFFERENCE: This is the STANDARD 1-Step model (NOT Plus) with leverage 1:100 and HAS consistency rule requirement, unlike the Plus version which has NO consistency rule and uses 1:50 leverage.`
+  },
+
+  {
+  title: "PropScholar 2 Step (Standard)",
+  url: "https://help.propscholar.com/article/2-step-evaluation",
+  category: "Evaluations",
+  content: `PropScholar 2-Step STANDARD model (NOT Plus) is a two-phase evaluation WITH consistency rule. PHASE 1 (Examinee Phase): Profit target 8%, leverage 1:100, no time limit. PHASE 2 (Scholar Phase): Profit target 5%, leverage 1:100, no time limit. RISK RULES: Maximum Loss Limit is 8% of initial account size (hard breach). Example: $100,000 account cannot drop below $92,000. Daily Loss Limit is 4% based on higher value between starting equity or balance (hard breach, resets daily at 00:00 UTC). Example 1: Day starts with $105,000 balance and $107,000 equity, equity cannot fall below $102,720 that day. Example 2: Day starts with $100,000 balance and $99,000 equity, equity cannot fall below $96,000 that day. GENERAL RULES: No lot limit. Weekend holding allowed. No news trading restrictions. No time limit on phases. 14 days inactivity limit. Consistency Rule REQUIRED: No single day can exceed 45% of total profit. Copy trading between two PropScholar accounts not allowed. Tick scalping, glitch exploitation, and insider signals prohibited. KEY DIFFERENCE: This is the STANDARD 2-Step model (NOT Plus) with leverage 1:100 and HAS 45% consistency rule requirement, unlike the Plus version which has NO consistency rule, requires 3 minimum profitable days, and has 2 minute average holding time soft breach.`
+  },
+
+
   // ADD MORE ARTICLES HERE as you get them
 ];
 
