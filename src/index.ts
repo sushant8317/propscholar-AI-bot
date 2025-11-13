@@ -12,7 +12,6 @@ const qaSchema = new mongoose.Schema({
   answer: { type: String, required: true },
   userId: { type: String, required: true },
   username: { type: String, required: true },
-  feedback: { type: String, enum: ['positive', 'negative', 'none'], default: 'none' },
   timestamp: { type: Date, default: Date.now }
 });
 
@@ -89,22 +88,8 @@ client.on('messageCreate', async (message: Message) => {
 
     const answer = await askOpenAI(question);
 
-    const botReply = await message.reply(`**Answer:**\n${answer}\n\n_React with ✅ if this helped or ❌ if it didn't_`);
+    const botReply = await message.reply(`**Answer:**\n${answer}}`);
 
-    const qaRecord = new QA({
-      question,
-      answer,
-      userId: message.author.id,
-      username: message.author.username
-    });
-    await qaRecord.save();
-
-    await botReply.react('✅');
-    await botReply.react('❌');
-
-  } catch (error) {
-    console.error('Error handling message:', error);
-    message.reply('Sorry, something went wrong. Please try again later.');
   }
 });
 
