@@ -40,10 +40,8 @@ const client = new Client({
 const askOpenAI = async (question: string): Promise<string> => {
   try {
     const response = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: 'gpt-3.5-turbo',
-        messages: [
+'https://api.groq.com/openai/v1/chat/completions',      {
+model: 'llama-3.1-70b-versatile',        messages: [
           {
             role: 'system',
             content: 'You are a helpful support assistant for PropScholar, a prop trading platform. Answer questions about trading, platform features, and account management.'
@@ -55,7 +53,7 @@ const askOpenAI = async (question: string): Promise<string> => {
       },
       {
         headers: {
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+          'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
           'Content-Type': 'application/json'
         }
       }
