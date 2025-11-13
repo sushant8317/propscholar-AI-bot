@@ -46,6 +46,7 @@ const askOpenAI = async (question: string): Promise<string> => {
 model: 'llama-3.1-8b-instant',       messages: [          {
             role: 'system',
             content: systemPrompt
+                    },
           { role: 'user', content: question }
         ],
         max_tokens: 500,
