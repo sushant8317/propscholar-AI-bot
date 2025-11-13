@@ -41,8 +41,7 @@ const askOpenAI = async (question: string): Promise<string> => {
   try {
     const response = await axios.post(
 'https://api.groq.com/openai/v1/chat/completions',      {
-model: 'llama-3.1-70b-versatile',        messages: [
-          {
+model: 'llama-3.1-8b-instant',       messages: [          {
             role: 'system',
             content: 'You are a helpful support assistant for PropScholar, a prop trading platform. Answer questions about trading, platform features, and account management.'
           },
