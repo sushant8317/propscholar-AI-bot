@@ -45,7 +45,46 @@ const HELP_ARTICLES = [
     url: "https://help.propscholar.com",
     category: "Evaluations",
     content: `CRITICAL COMPARISON: PropScholar offers TWO model types - Plus and Standard - available in both 1-Step and 2-Step formats. PLUS MODEL (both 1-Step Plus and 2-Step Plus): NO consistency rule, HAS minimum 3 profitable days requirement, HAS average holding time 2 minutes minimum (soft breach if done first time second time if repeated will result in hard breach). STANDARD MODEL (both 1-Step Standard and 2-Step Standard): HAS 45% consistency rule (no single day exceeds 45% of total profit), NO minimum profitable days requirement, NO average holding time requirement. When answering questions, ALWAYS compare both models. Example: If asked about minimum profitable days, answer: PropScholar Plus models (1-Step Plus and 2-Step Plus) require minimum 3 profitable days, but Standard models (1-Step Standard and 2-Step Standard) have NO minimum profitable days requirement. Example: If asked about consistency rule, answer: PropScholar Standard models (1-Step Standard and 2-Step Standard) have 45% consistency rule, but Plus models (1-Step Plus and 2-Step Plus) have NO consistency rule. Example: If asked about news trading, answer: Both Plus and Standard models allow news trading with no restrictions. This applies to all four evaluation types: 1-Step Standard, 1-Step Plus, 2-Step Standard, and 2-Step Plus.`
-  }
+  },
+
+  {
+  title: "Average Holding Time - PropScholar Plus Model",
+  url: "https://help.propscholar.com/article/average-holding-time-propscholar-plus",
+  category: "Evaluation Rules",
+  content: `Average Holding Time rule applies ONLY to PropScholar Plus Model (1-Step Plus and 2-Step Plus), NOT Standard models. Minimum average holding time is 2 minutes. This does NOT mean every single trade must be held for exactly 2 minutes - it means most trades should average more than 2 minutes across your trading history. Example: If you take 10 trades, your average holding time should be above 2 minutes. SOFT BREACH CONDITION: If your average holding time drops below 2 minutes, it is a soft breach - your account will be reset but NOT permanently breached or terminated. STOP LOSS EXCEPTION: If a trade hits Stop Loss (SL) within 2 minutes, it is accepted and does NOT count negatively against the average, since quick SL hits are normal. SUMMARY: Minimum average 2+ minutes per trade. Below 2 minutes = soft breach (reset, not terminated). SL hits under 2 minutes are accepted. Purpose is to ensure real market engagement and avoid ultra-short scalping. This rule exists in Plus models ONLY, Standard models have NO average holding time requirement.`
+  },
+
+  {
+  title: "Toxic Trading Flow - Prohibited Behaviors",
+  url: "https://help.propscholar.com/article/toxic-trading-flow",
+  category: "Evaluation Rules",
+  content: `Toxic trading refers to risky, impulsive trading behaviors that endanger trader accounts and firm stability. PROHIBITED BEHAVIORS: 1) Excessive Risk-Taking (Over-Leveraging): Trading with disproportionately high risk, excessive leverage, overexposure or full margin use. 2) Gambling Behavior: Emotion-driven trading, pursuing losses, impulsive trades, addictive patterns. Splitting one trade into multiple positions counts as single trade. 3) Overtrading: Continuously entering/exiting trades without clear strategy, causing diminished profitability and emotional exhaustion. 4) High-Frequency Trading (HFT) and Tick Scalping: Excessive rapid trading with higher volatility risking significant losses. 5) Arbitrage (all forms prohibited): Hedge Arbitrage (opposing positions with different firms simultaneously) and Latency Arbitrage (exploiting execution time differences across platforms for price disparities). 6) Poor Money Management: Frequent margin calls, inadequate funds, risky positions showing lack of risk management. 7) Behavioral Patterns: Trading during non-liquid hours to exploit liquidity shortages, consistently ignoring risk management, emotional decisions. 8) Reverse Trading: Risking full daily loss on one trade, indicates reverse trading between firms. 9) Martingale: Adding positions in drawdown to recover losses. Example: First trade loses, you open larger position same direction, continue adding trades expecting reversal. CONSEQUENCES: If toxic trading detected, account is BREACHED immediately and termination email sent. Account CANNOT be recovered under any circumstances once breached for toxic trading. PropScholar collects trading flow data during evaluations to improve operations and maintain stable trading environment.`
+  },
+
+  {
+  title: "Forbidden Strategies in PropScholar",
+  url: "https://help.propscholar.com/article/forbidden-statergies-in-propscholar",
+  category: "Evaluation Rules",
+  content: `PropScholar allows trading freedom - scalping, intraday, or swing trading - with no restrictions on lot size or timing. However, unfair, manipulative, or exploitative strategies are STRICTLY PROHIBITED. FORBIDDEN STRATEGIES (immediate termination if used): 1) Gap trading, 2) High-frequency trading (HFT), 3) Averaging Positions, 4) Server spamming, 5) Martingale, 6) Latency arbitrage, 7) Toxic trading flow, 8) Hedging across accounts, 9) Long-short arbitrage, 10) Reverse arbitrage, 11) Tick scalping, 12) Server execution abuse, 13) Opposite account trading, 14) Copy trading between PropScholar accounts, 15) Third-party account management. EXPERT ADVISORS (EAs): You may ONLY use third-party EAs that function as trade managers or risk managers. Signal-following bots, scalpers, or execution manipulators are NOT allowed. Using prohibited EAs results in denial of evaluation/reward and account closure. CONSEQUENCES: Engaging in any forbidden strategy leads to immediate termination of evaluation and disqualification from PropScholar program. PropScholar is skill-based - you don't pay full challenge price, but cheating is not tolerated.`
+  },
+
+  {
+  title: "45% Consistency Rule Explained",
+  url: "https://help.propscholar.com/article/all-about-consistency-rule",
+  category: "Evaluation Rules",
+  content: `The 45% consistency rule applies to PropScholar STANDARD models ONLY (1-Step Standard and 2-Step Standard), NOT Plus models. This rule ensures profits are generated in balanced, steady manner rather than from single high-profit day. NO individual trading day should contribute more than 45% of your total profit target during evaluation. This assesses consistency, discipline, and trading skill across multiple sessions. EXAMPLE: $5,000 account with 8% profit target equals $400 total target. To comply with 45% rule, no single day can contribute more than $180 (which is 45% of $400). If you earn more than $180 in one day, account will breach the consistency rule. BENEFITS OF THIS RULE: Encourages steady and disciplined trading. Prevents overtrading and emotional decision-making. Reduces reliance on single high-risk trades. Builds strong, repeatable trading habits. Promotes long-term profitability and skill development. REMINDER: Plus models (1-Step Plus and 2-Step Plus) have NO consistency rule, while Standard models (1-Step Standard and 2-Step Standard) REQUIRE 45% consistency compliance.`
+  },
+
+  {
+  title: "What Happens If I Breach a Trading Objective",
+  url: "https://help.propscholar.com/article/what-happens-if-i-breach-a-trading-objective",
+  category: "Evaluation Rules",
+  content: `If you breach any trading objective, you will receive an email by 00:00 UTC next day. All open trades will be closed immediately, and any active limit or stop orders will be canceled. Your account credentials will no longer be active. BREACH EMAIL DETAILS: You will receive an email detailing the exact reason for breach, including which rule was violated, when it occurred, and how it impacted your account. This ensures full transparency and helps you understand what went wrong. Account becomes inactive after breach and cannot be recovered. All trading activity stops immediately once breach is detected.`
+  },
+
+
+
+
 
   // ADD MORE ARTICLES HERE as you get them
 ];
