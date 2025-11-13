@@ -177,42 +177,6 @@ client.on('messageCreate', async (message: Message) => {
   }
 });
 
-client.on('messageReactionAdd', async (
-  reaction: MessageReaction | PartialMessageReaction,
-  user: User | PartialUser
-) => {
-  if (user.bot) return;
-
-  try {
-    if (reaction.partial) {
-      await reaction.fetch();
-    }
-    if (reaction.message.partial) {
-      await reaction.message.fetch();
-    }
-
-    if (reaction.message.author?.id !== client.user?.id) return;
-
-    const messageContent = reaction.message.content;
-    if (!messageContent) return;
-
-    const answerMatch = messageContent.match(/\*\*Answer:\*\*\\n([\\s\\S]+?)\\n\\n/);
-    if (!answerMatch) return;
-
-    const answer = answerMatch[1];
-    const feedback = reaction.emoji.name === '✅' ? 'positive' : reaction.emoji.name === '❌' ? 'negative' : 'none';
-
-    await QA.findOneAndUpdate(
-      { answer: answer },
-      { feedback: feedback },
-      { sort: { timestamp: -1 } }
-    );
-
-    console.log(`Feedback received: ${feedback} from ${user.tag}`);
-  } catch (error) {
-    console.error('Error handling reaction:', error);
-  }
-});
 
 connectDB().then(() => {
   client.login(process.env.DISCORD_TOKEN);
