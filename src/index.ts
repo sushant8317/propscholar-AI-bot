@@ -175,6 +175,9 @@ client.on('messageCreate', async (message: Message) => {
     const botReply = await message.reply(`**Answer:**\n${answer}}`);
 
   }
+   catch (error) {
+             console.error('Error in messageCreate handler:', error);
+         }
 });
 
 
