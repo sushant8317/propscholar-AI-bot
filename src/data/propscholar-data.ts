@@ -93,7 +93,7 @@ const HELP_ARTICLES = [
 // STATIC FALLBACK DATA
 // ========================================
 const STATIC_DATA = {
-  about: "PropScholar is India's most affordable prop trading firm. Start trading with our capital from just 5! We provide trading capital, tools, and education so anyone can become a professional trader.",
+  about: "PropScholar is India's most affordable prop trading firm. Start trading with our capital from just $5! We provide trading capital, tools, and education so anyone can become a professional trader.",
   
   features: [
     "Start with just $5 - lowest in India!",
@@ -264,7 +264,7 @@ export async function getPropScholarData(): Promise<string> {
   }, {} as Record<string, Article[]>);
   
   let prompt = `You are a professional support assistant for PropScholar. Provide direct, accurate, and helpful answers.\n\n`;
-  
+
   // ========================================
   // RESPONSE GUIDELINES
   // ========================================
@@ -272,51 +272,47 @@ export async function getPropScholarData(): Promise<string> {
   prompt += `1. Give short, direct answers (1-3 sentences)\n`;
   prompt += `2. Be professional and helpful - NO emojis\n`;
   prompt += `3. Always cite sources: "Source: [URL]"\n`;
-  prompt += `4. If info not in knowledge base: "I don't have that information. Visit help.propscholar.com or contact support."\n`;
-  prompt += `5. Never make up information\n\n`;
-  
+  prompt += `4. ONLY use URLs listed in the knowledge base - do not add any characters, brackets, or curly braces after the link.\n`;
+  prompt += `5. If info not in knowledge base: "I don't have that information. Visit help.propscholar.com or contact support."\n`;
+  prompt += `6. Never make up information\n\n`;
+
   // ========================================
   // EXAMPLE RESPONSES
   // ========================================
   prompt += `## CORRECT RESPONSE EXAMPLES:\n\n`;
-  
   prompt += `User: "What is the consistency rule?"\n`;
-  prompt += `Bot: "No single trading day can exceed 45% of your total profit target. For example, on a $5,000 account with an 8% ($400) target, no day can exceed $180 profit. Source: https://help.propscholar.com/consistency-rule"\n\n`;
-  
+  prompt += `Bot: "No single trading day can exceed 45% of your total profit target. For example, on a $5,000 account with an 8% ($400) target, no day can exceed $180 profit. Source: https://help.propscholar.com/article/all-about-consistency-rule"\n\n`;
   prompt += `User: "How do I pay?"\n`;
-  prompt += `Bot: "We accept PayPal, PhonePe (UPI), Paytm, and credit/debit cards. Indian traders can use instant UPI payment. Source: https://help.propscholar.com/payment-methods"\n\n`;
-  
+  prompt += `Bot: "We accept PayPal, PhonePe (UPI), Paytm, and credit/debit cards. Indian traders can use instant UPI payment. Source: https://help.propscholar.com/article/payment-methods"\n\n`;
   prompt += `User: "When do I get my account?"\n`;
-  prompt += `Bot: "Evaluation accounts are delivered within 24-48 hours via email. Discord members get priority delivery within 12 hours. Source: https://help.propscholar.com/account-delivery"\n\n`;
-  
+  prompt += `Bot: "Evaluation accounts are delivered within 24-48 hours via email. Discord members get priority delivery within 12 hours. Source: https://help.propscholar.com/article/account-delivery"\n\n`;
   prompt += `User: "Can I use EAs?"\n`;
-  prompt += `Bot: "Yes, Expert Advisors (EAs) and bots are fully allowed on all platforms. Source: https://help.propscholar.com/platforms"\n\n`;
-  
+  prompt += `Bot: "Yes, Expert Advisors (EAs) and bots are fully allowed on all platforms. Source: https://help.propscholar.com/article/platforms"\n\n`;
+
   // ========================================
   // HELP CENTER KNOWLEDGE BASE (PRIMARY SOURCE)
   // ========================================
   prompt += `## HELP CENTER KNOWLEDGE BASE (PRIMARY SOURCE):\n\n`;
-  
   Object.entries(categorizedArticles).forEach(([category, articles]) => {
     prompt += `### ${category}\n\n`;
     articles.forEach(article => {
       prompt += `Title: ${article.title}\n`;
-      prompt += `URL: ${article.url}\n`;
+      prompt += `URL: ${article.url}\n`; // ensure article.url never ends with }
       prompt += `Content: ${article.content}\n\n`;
     });
   });
-  
+
   // ========================================
   // STATIC COMPANY INFO (SECONDARY SOURCE)
   // ========================================
   prompt += `## COMPANY OVERVIEW:\n${STATIC_DATA.about}\n\n`;
-  
+
   prompt += `## KEY FEATURES:\n`;
   STATIC_DATA.features.forEach(feature => {
     prompt += `• ${feature}\n`;
   });
   prompt += `\n`;
-  
+
   // ========================================
   // LIVE DATA (if available)
   // ========================================
@@ -327,7 +323,7 @@ export async function getPropScholarData(): Promise<string> {
     });
     prompt += `\n`;
   }
-  
+
   if (liveData?.updates) {
     prompt += `## LATEST UPDATES:\n`;
     liveData.updates.forEach((update: string) => {
@@ -335,28 +331,29 @@ export async function getPropScholarData(): Promise<string> {
     });
     prompt += `\n`;
   }
-  
+
   // ========================================
   // WEBSITE CONTENT (ADDITIONAL CONTEXT)
   // ========================================
   if (pages.length > 0) {
     prompt += `## ADDITIONAL WEBSITE CONTENT (from ${pages.length} pages):\n\n`;
-    
     pages.forEach(page => {
       prompt += `Page: ${page.title}\n`;
       prompt += `URL: ${page.url}\n`;
       prompt += `Content: ${page.content.substring(0, 400)}...\n\n`;
     });
   }
-  
+
   // ========================================
   // CITATION REQUIREMENTS
   // ========================================
   prompt += `## CITATION FORMAT:\n`;
   prompt += `Always end responses with: "Source: [exact URL]"\n`;
+  prompt += `Example: Source: https://help.propscholar.com/article/account-delivery\n`;
+  prompt += `Do not include any characters such as } or %7D after the URL.\n`;
   prompt += `For multiple sources: "Sources: [URL1], [URL2]"\n`;
   prompt += `Prioritize help.propscholar.com URLs when available\n\n`;
-  
+
   // ========================================
   // EDGE CASES
   // ========================================
@@ -365,9 +362,9 @@ export async function getPropScholarData(): Promise<string> {
   prompt += `- Technical errors: "Open a support ticket at help.propscholar.com with error details."\n`;
   prompt += `- Pricing: "Visit propscholar.com/pricing for current rates."\n`;
   prompt += `- Unknown: "I don't have that information. Check help.propscholar.com or contact support."\n\n`;
-  
-  prompt += `Remember: Short, professional, cite sources, no emojis.`;
-  
+
+  prompt += `Remember: Short, professional, cite sources, no emojis. Never add stray characters to URLs after source links.`;
+
   return prompt;
 }
 
