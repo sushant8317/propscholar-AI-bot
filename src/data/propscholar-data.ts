@@ -108,15 +108,25 @@ async function fetchAllPages(): Promise<PageContent[]> {
   const urls = await fetchSitemap();
   console.log(`📄 Fetching content from ${urls.length} pages...`);
   
-  const promises = urls.map(url => fetchPageContent(url));
-  const results = await Promise.allSettled(promises);
+const pages: PageContent[] = [];
   
-  const pages: PageContent[] = [];
-  results.forEach(result => {
-    if (result.status === 'fulfilled' && result.value) {
-      pages.push(result.value);
+  // Traverse pages sequentially (one by one)
+  for (let i = 0; i < urls.length; i++) {
+    const url = urls[i];
+    console.log(`📄 [${i + 1}/${urls.length}] Fetching: ${url}`);
+    
+    try {
+      const pageData = await fetchPageContent(url);
+      if (pageData) {
+        pages.push(pageData);
+        console.log(`✅ [${i + 1}/${urls.length}] Success: ${pageData.title}`);
+      } else {
+        console.log(`⚠️ [${i + 1}/${urls.length}] Skipped: ${url}`);
+      }
+    } catch (error) {
+      console.log(`❌ [${i + 1}/${urls.length}] Failed: ${url}`);
     }
-  });
+  }
   
   console.log(`✅ Successfully fetched ${pages.length} pages`);
   return pages;
