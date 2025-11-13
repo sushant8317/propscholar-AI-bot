@@ -1,0 +1,25 @@
+{
+  "name": "propscholar-ai-bot",
+  "version": "1.0.0",
+  "description": "AI-powered Discord support bot with feedback learning",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "node dist/index.js",
+    "build": "tsc",
+    "dev": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "axios": "^1.6.0",
+    "mongoose": "^8.0.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "ts-node": "^10.9.1",
+    "@types/node": "^20.10.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
