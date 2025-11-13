@@ -28,6 +28,7 @@ const STATIC_DATA = {
 
 // URLs
 const SITEMAP_URL = 'https://www.propscholar.com/sitemap.xml';
+const HELP_SITEMAP_URL = 'https://help.propscholar.com/sitemap.xml';
 const API_ENDPOINT = 'https://www.propscholar.com/api/bot-data';
 
 interface PropScholarAPIData {
@@ -47,24 +48,43 @@ interface PageContent {
 async function fetchSitemap(): Promise<string[]> {
   try {
     console.log('📡 Fetching sitemap from PropScholar.com...');
-    const response = await axios.get(SITEMAP_URL, { 
+// Fetch from MAIN website sitemap
+    console.log(`🌍 Fetching sitemap from PropScholar.com...`);
+    const response1 = await axios.get(SITEMAP_URL, {
       timeout: 8000,
       headers: { 'User-Agent': 'PropScholar-Discord-Bot' }
     });
-    
-    // Parse XML sitemap
-    const $ = cheerio.load(response.data, { xmlMode: true });
-    const urls: string[] = [];
-    
-    $('url loc').each((i, elem) => {
-      const url = $(elem).text();
-      if (url && !url.includes('.xml')) { // Exclude nested sitemaps
-        urls.push(url);
+    const $1 = cheerio.load(response1.data, { xmlMode: true });
+    const urls1: string[] = [];
+    $1('url loc').each((i, elem) => {
+      const url = $1(elem).text();
+      if (url && !url.includes('.xml')) {
+        urls1.push(url);
       }
     });
+    console.log(`✅ Found ${urls1.length} pages in main sitemap`);
+
+    // Fetch from HELP docs sitemap
+    console.log(`📚 Fetching sitemap from help.propscholar.com...`);
+    const response2 = await axios.get(HELP_SITEMAP_URL, {
+      timeout: 8000,
+      headers: { 'User-Agent': 'PropScholar-Discord-Bot' }
+    });
+    const $2 = cheerio.load(response2.data, { xmlMode: true });
+    const urls2: string[] = [];
+    $2('url loc').each((i, elem) => {
+      const url = $2(elem).text();
+      if (url && !url.includes('.xml')) {
+        urls2.push(url);
+      }
+    });
+    console.log(`✅ Found ${urls2.length} pages in help sitemap`);
+
+    // Combine all URLs
+    const allUrls = [...urls1, ...urls2];
+    console.log(`📦 Total pages to scrape: ${allUrls.length}`);
     
-    console.log(`✅ Found ${urls.length} pages in sitemap`);
-    return urls.slice(0, 20); // Limit to 20 pages to avoid timeout
+    return allUrls.slice(0, 40); // Increased limit to 40 pages for both sites
   } catch (error) {
     console.log('⚠️ Could not fetch sitemap, using fallback');
     return [
