@@ -45,7 +45,7 @@ const HELP_ARTICLES = [
     url: "https://help.propscholar.com",
     category: "Evaluations",
     content: `CRITICAL COMPARISON: PropScholar offers TWO model types - Plus and Standard - available in both 1-Step and 2-Step formats. PLUS MODEL (both 1-Step Plus and 2-Step Plus): NO consistency rule, HAS minimum 3 profitable days requirement, HAS average holding time 2 minutes minimum (soft breach if done first time second time if repeated will result in hard breach). STANDARD MODEL (both 1-Step Standard and 2-Step Standard): HAS 45% consistency rule (no single day exceeds 45% of total profit), NO minimum profitable days requirement, NO average holding time requirement. When answering questions, ALWAYS compare both models. Example: If asked about minimum profitable days, answer: PropScholar Plus models (1-Step Plus and 2-Step Plus) require minimum 3 profitable days, but Standard models (1-Step Standard and 2-Step Standard) have NO minimum profitable days requirement. Example: If asked about consistency rule, answer: PropScholar Standard models (1-Step Standard and 2-Step Standard) have 45% consistency rule, but Plus models (1-Step Plus and 2-Step Plus) have NO consistency rule. Example: If asked about news trading, answer: Both Plus and Standard models allow news trading with no restrictions. This applies to all four evaluation types: 1-Step Standard, 1-Step Plus, 2-Step Standard, and 2-Step Plus.`
-  },
+  }
 
   // ADD MORE ARTICLES HERE as you get them
 ];
