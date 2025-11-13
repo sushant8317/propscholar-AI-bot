@@ -262,10 +262,9 @@ export async function getPropScholarData(): Promise<string> {
   prompt += `## RESPONSE RULES:\n`;
   prompt += `1. Give short, direct answers (1-3 sentences)\n`;
   prompt += `2. Be professional and helpful - NO emojis\n`;
-  prompt += `3. Always cite sources: "Source: [URL]"\n`;
-  prompt += `4. Do not add characters (brackets, braces, etc.) after any URL in your response.\n`;
-  prompt += `5. If info not in knowledge base: "I don't have that information. Visit help.propscholar.com or contact support."\n`;
-  prompt += `6. Never make up information\n\n`;
+  prompt += `3. Do not add characters (brackets, braces, etc.) after any URL in your response.\n`;
+  prompt += `4. If info not in knowledge base: "I don't have that information. Visit help.propscholar.com or contact support."\n`;
+  prompt += `5. Never make up information\n\n`;
 
   prompt += `## CORRECT RESPONSE EXAMPLES:\n\n`;
   prompt += `User: "What is the consistency rule?"\n`;
