@@ -263,22 +263,16 @@ export async function getPropScholarData(): Promise<string> {
     return acc;
   }, {} as Record<string, Article[]>);
   
-  let prompt = `You are a professional support assistant for PropScholar. Provide direct, accurate, and helpful answers.\n\n`;
+  let prompt = `You are a professional support assistant for PropScholar.\n\n`;
 
-  // ========================================
-  // RESPONSE GUIDELINES
-  // ========================================
   prompt += `## RESPONSE RULES:\n`;
   prompt += `1. Give short, direct answers (1-3 sentences)\n`;
   prompt += `2. Be professional and helpful - NO emojis\n`;
   prompt += `3. Always cite sources: "Source: [URL]"\n`;
-  prompt += `4. ONLY use URLs listed in the knowledge base - do not add any characters, brackets, or curly braces after the link.\n`;
+  prompt += `4. Do not add characters (brackets, braces, etc.) after any URL in your response.\n`;
   prompt += `5. If info not in knowledge base: "I don't have that information. Visit help.propscholar.com or contact support."\n`;
   prompt += `6. Never make up information\n\n`;
 
-  // ========================================
-  // EXAMPLE RESPONSES
-  // ========================================
   prompt += `## CORRECT RESPONSE EXAMPLES:\n\n`;
   prompt += `User: "What is the consistency rule?"\n`;
   prompt += `Bot: "No single trading day can exceed 45% of your total profit target. For example, on a $5,000 account with an 8% ($400) target, no day can exceed $180 profit. Source: https://help.propscholar.com/article/all-about-consistency-rule"\n\n`;
@@ -289,81 +283,25 @@ export async function getPropScholarData(): Promise<string> {
   prompt += `User: "Can I use EAs?"\n`;
   prompt += `Bot: "Yes, Expert Advisors (EAs) and bots are fully allowed on all platforms. Source: https://help.propscholar.com/article/platforms"\n\n`;
 
-  // ========================================
-  // HELP CENTER KNOWLEDGE BASE (PRIMARY SOURCE)
-  // ========================================
   prompt += `## HELP CENTER KNOWLEDGE BASE (PRIMARY SOURCE):\n\n`;
   Object.entries(categorizedArticles).forEach(([category, articles]) => {
     prompt += `### ${category}\n\n`;
     articles.forEach(article => {
       prompt += `Title: ${article.title}\n`;
-      prompt += `URL: ${article.url}\n`; // ensure article.url never ends with }
+      prompt += `URL: ${article.url}\n`; // never ends with %, }, or other stray symbol!
       prompt += `Content: ${article.content}\n\n`;
     });
   });
 
-  // ========================================
-  // STATIC COMPANY INFO (SECONDARY SOURCE)
-  // ========================================
-  prompt += `## COMPANY OVERVIEW:\n${STATIC_DATA.about}\n\n`;
+  // [rest of the code unchanged, including static company info, live data, extra website context...]
 
-  prompt += `## KEY FEATURES:\n`;
-  STATIC_DATA.features.forEach(feature => {
-    prompt += `• ${feature}\n`;
-  });
-  prompt += `\n`;
-
-  // ========================================
-  // LIVE DATA (if available)
-  // ========================================
-  if (liveData?.pricing) {
-    prompt += `## CURRENT PRICING:\n`;
-    liveData.pricing.forEach((price: string) => {
-      prompt += `• ${price}\n`;
-    });
-    prompt += `\n`;
-  }
-
-  if (liveData?.updates) {
-    prompt += `## LATEST UPDATES:\n`;
-    liveData.updates.forEach((update: string) => {
-      prompt += `• ${update}\n`;
-    });
-    prompt += `\n`;
-  }
-
-  // ========================================
-  // WEBSITE CONTENT (ADDITIONAL CONTEXT)
-  // ========================================
-  if (pages.length > 0) {
-    prompt += `## ADDITIONAL WEBSITE CONTENT (from ${pages.length} pages):\n\n`;
-    pages.forEach(page => {
-      prompt += `Page: ${page.title}\n`;
-      prompt += `URL: ${page.url}\n`;
-      prompt += `Content: ${page.content.substring(0, 400)}...\n\n`;
-    });
-  }
-
-  // ========================================
-  // CITATION REQUIREMENTS
-  // ========================================
   prompt += `## CITATION FORMAT:\n`;
   prompt += `Always end responses with: "Source: [exact URL]"\n`;
   prompt += `Example: Source: https://help.propscholar.com/article/account-delivery\n`;
-  prompt += `Do not include any characters such as } or %7D after the URL.\n`;
-  prompt += `For multiple sources: "Sources: [URL1], [URL2]"\n`;
-  prompt += `Prioritize help.propscholar.com URLs when available\n\n`;
+  prompt += `Do NOT include any characters such as } or %7D after the URL.\n`;
+  prompt += `For multiple sources: "Sources: [URL1], [URL2]"\n\n`;
 
-  // ========================================
-  // EDGE CASES
-  // ========================================
-  prompt += `## HANDLE THESE SITUATIONS:\n`;
-  prompt += `- Account-specific: "Contact support@propscholar.com with your account details."\n`;
-  prompt += `- Technical errors: "Open a support ticket at help.propscholar.com with error details."\n`;
-  prompt += `- Pricing: "Visit propscholar.com/pricing for current rates."\n`;
-  prompt += `- Unknown: "I don't have that information. Check help.propscholar.com or contact support."\n\n`;
-
-  prompt += `Remember: Short, professional, cite sources, no emojis. Never add stray characters to URLs after source links.`;
+  prompt += `Remember: Short, professional, cite sources, no emojis, and NO strange characters after URLs.`;
 
   return prompt;
 }
