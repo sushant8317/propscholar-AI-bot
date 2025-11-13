@@ -1,4 +1,5 @@
 import { Client, GatewayIntentBits, Message, MessageReaction, User, PartialMessageReaction, PartialUser, TextChannel, DMChannel } from 'discord.js';
+import http from 'http';
 import axios from 'axios';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
