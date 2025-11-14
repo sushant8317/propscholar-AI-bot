@@ -1,4 +1,6 @@
-import { EmbeddingService } from './embedding.service';
+// src/services/rag.service.ts
+
+import EmbeddingService from './embedding.service';
 import { VectorService } from './vector.service';
 import axios from 'axios';
 
@@ -13,7 +15,7 @@ export class RAGService {
 
   async getRelevantContext(query: string, topK: number = 3) {
     try {
-      const queryEmbedding = await this.embeddingService.createEmbedding(query);
+      const queryEmbedding = await this.embeddingService.embed(query); // FIXED
       const similarDocs = await this.vectorService.findSimilar(queryEmbedding, topK, 0.6);
       return similarDocs.map((doc: any) => ({
         content: doc.content,
@@ -32,7 +34,7 @@ export class RAGService {
       const contextString = context
         .map((item, i) => `[Context ${i + 1} - Score: ${item.score.toFixed(2)}]\n${item.content}\n`)
         .join('\n');
-      
+
       const systemPrompt = `You are PropScholar's expert AI assistant specializing in prop trading and trading education.
 RELEVANT KNOWLEDGE BASE:
 ${contextString || 'No specific context found. Use general knowledge.'}
@@ -45,8 +47,9 @@ INSTRUCTIONS:
 - Keep answers concise but thorough
 ${conversationHistory.length > 0
   ? `CONVERSATION HISTORY:\n${conversationHistory.map(m => `${m.role}: ${m.content}`).join('\n')}\n`
-  : ''}
+  : '' }
 Now answer the user's question:`;
+
 
       const response = await axios.post(
         'https://api.groq.com/openai/v1/chat/completions',

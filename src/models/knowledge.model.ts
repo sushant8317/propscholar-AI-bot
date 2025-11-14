@@ -1,17 +1,32 @@
-import mongoose from 'mongoose';
+import mongoose, { Schema, Document } from "mongoose";
 
-const KnowledgeSchema = new mongoose.Schema({
+export interface IKnowledge extends Document {
+  content: string;
+  embedding: number[];
+  metadata: {
+    source?: string;
+    sourceId?: string;   // <-- REQUIRED
+    title?: string;
+    url?: string;
+    category?: string;
+    question?: string;
+    keywords?: string[];
+    [key: string]: any;
+  };
+}
+
+const KnowledgeSchema = new Schema<IKnowledge>({
   content: { type: String, required: true },
   embedding: { type: [Number], required: true },
+
   metadata: {
-    category: String,
-    source: String,
-    keywords: [String]
-  },
-  createdAt: { type: Date, default: Date.now }
-});
+    type: Object,
+    default: {},
+  }
+}, { strict: false });  // <-- ALLOWS ANY metadata fields
+// IMPORTANT 🔥🔥🔥
 
-KnowledgeSchema.index({ 'metadata.category': 1 });
-KnowledgeSchema.index({ createdAt: -1 });
-
-export const Knowledge = mongoose.model('Knowledge', KnowledgeSchema);
+export const Knowledge = mongoose.model<IKnowledge>(
+  "Knowledge",
+  KnowledgeSchema
+);

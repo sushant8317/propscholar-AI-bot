@@ -1,39 +1,43 @@
-import OpenAI from 'openai';
+// src/services/embedding.service.ts
+import OpenAI from "openai";
 
-export class EmbeddingService {
-  private openai: OpenAI;
+export default class EmbeddingService {
+  private client: OpenAI;
 
   constructor() {
-    this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY
-    });
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error("❌ OPENAI_API_KEY missing in .env");
+
+    this.client = new OpenAI({ apiKey });
   }
 
-  async createEmbedding(text: string): Promise<number[]> {
+  // Create ONE embedding
+  async embed(text: string): Promise<number[]> {
     try {
-      const response = await this.openai.embeddings.create({
-        model: "text-embedding-ada-002",
-        input: text,
+      const res = await this.client.embeddings.create({
+        model: process.env.EMBEDDING_MODEL || "text-embedding-3-small",
+        input: text
       });
-      
-      return response.data[0].embedding;
+
+      return res.data[0].embedding;
     } catch (error) {
-      console.error('Error creating embedding:', error);
-      throw error;
+      console.error("❌ Embedding error:", error);
+      return [];
     }
   }
 
-  async createBatchEmbeddings(texts: string[]): Promise<number[][]> {
+  // Create MANY embeddings (batch)
+  async embedBatch(texts: string[]): Promise<number[][]> {
     try {
-      const response = await this.openai.embeddings.create({
-        model: "text-embedding-ada-002",
-        input: texts,
+      const res = await this.client.embeddings.create({
+        model: process.env.EMBEDDING_MODEL || "text-embedding-3-small",
+        input: texts
       });
-      
-      return response.data.map(item => item.embedding);
+
+      return res.data.map((d: any) => d.embedding);
     } catch (error) {
-      console.error('Error creating batch embeddings:', error);
-      throw error;
+      console.error("❌ Batch Embedding error:", error);
+      return texts.map(() => []);
     }
   }
 }
