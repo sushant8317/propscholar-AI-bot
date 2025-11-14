@@ -1,12 +1,25 @@
-import { Client, GatewayIntentBits, Message, MessageReaction, User, PartialMessageReaction, PartialUser, TextChannel, DMChannel } from 'discord.js';
+import { 
+  Client, 
+  GatewayIntentBits, 
+  Message 
+} from 'discord.js';
+
 import http from 'http';
 import axios from 'axios';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+import express from "express";
+import cron from "node-cron";
+
+import adminRouter from "./controllers/admin.controller";
+import DynamicIngestService from "./services/dynamic-ingest.service";
 import { getPropScholarData } from './data/propscholar-data';
 
 dotenv.config();
 
+/* ----------------------------------------------------
+   Mongo Schema
+---------------------------------------------------- */
 const qaSchema = new mongoose.Schema({
   question: { type: String, required: true },
   answer: { type: String, required: true },
@@ -17,6 +30,9 @@ const qaSchema = new mongoose.Schema({
 
 const QA = mongoose.model('QA', qaSchema);
 
+/* ----------------------------------------------------
+   Mongo Connection
+---------------------------------------------------- */
 const connectDB = async () => {
   try {
     await mongoose.connect(process.env.MONGODB_URI as string);
@@ -27,6 +43,9 @@ const connectDB = async () => {
   }
 };
 
+/* ----------------------------------------------------
+   Discord Bot
+---------------------------------------------------- */
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -37,15 +56,19 @@ const client = new Client({
   ]
 });
 
+/* ----------------------------------------------------
+   AI Answer Function
+---------------------------------------------------- */
 const askOpenAI = async (question: string): Promise<string> => {
   try {
-        const systemPrompt = await getPropScholarData();
+    const systemPrompt = await getPropScholarData();
+
     const response = await axios.post(
-'https://api.groq.com/openai/v1/chat/completions',      {
-model: 'llama-3.1-8b-instant',       messages: [          {
-            role: 'system',
-            content: systemPrompt
-                    },
+      'https://api.groq.com/openai/v1/chat/completions',
+      {
+        model: 'llama-3.1-8b-instant',
+        messages: [
+          { role: 'system', content: systemPrompt },
           { role: 'user', content: question }
         ],
         max_tokens: 500,
@@ -58,6 +81,7 @@ model: 'llama-3.1-8b-instant',       messages: [          {
         }
       }
     );
+
     return response.data.choices[0].message.content;
   } catch (error: any) {
     console.error('OpenAI API Error:', error.response?.data || error.message);
@@ -65,127 +89,95 @@ model: 'llama-3.1-8b-instant',       messages: [          {
   }
 };
 
+/* ----------------------------------------------------
+   Bot Ready Event
+---------------------------------------------------- */
 client.on('ready', () => {
   console.log(`🤖 Bot logged in as ${client.user?.tag}`);
   console.log('✅ Ready to answer questions!');
 });
 
+/* ----------------------------------------------------
+   Message Handler
+---------------------------------------------------- */
 client.on('messageCreate', async (message: Message) => {
   if (message.author.bot) return;
-  // if (!message.content.startsWith('!ask')) return;
 
-
-    // ==========================================
-  // SPAM & SLANG FILTERING
-  // ==========================================
-  
   const messageContent = message.content.toLowerCase();
   const member = message.member;
-  
-  // Slang/Profanity words
+
+  // SPAM / SLANG FILTERING
   const slangs = ['fuck', 'shit', 'bitch', 'ass', 'bastard', 'wtf', 'stfu', 'retard', 'idiot', 'moron', 'stupid'];
-  
-  // Spam patterns (links, spam keywords)
   const spamPatterns = [
-    /discord\.gg/i,
-    /t\.me/i,
-    /bit\.ly/i,
-    /https?:\/\//i,
-    /dm me/i,
-    /check my/i,
-    /free money/i,
-    /click here/i,
-    /join my/i,
-    /telegram/i
+    /discord\.gg/i, /t\.me/i, /bit\.ly/i, /https?:\/\//i,
+    /dm me/i, /check my/i, /free money/i, /click here/i,
+    /join my/i, /telegram/i
   ];
-  
-  // Check for slang/profanity
-  const hasSlang = slangs.some(slang => messageContent.includes(slang));
-  if (hasSlang && member) {
+
+  if (slangs.some(s => messageContent.includes(s))) {
     try {
       await message.delete();
-      await member.timeout(24 * 60 * 60 * 1000, 'Inappropriate language');
-      console.log(`Deleted message and timed out user ${member.user.tag} for slang`);
-      return;
-    } catch (error) {
-      console.error('Error handling slang:', error);
-    }
+      await member?.timeout(86400000, 'Inappropriate language');
+    } catch {}
+    return;
   }
-  
-  // Check for spam/links
-  const isSpam = spamPatterns.some(pattern => pattern.test(message.content));
-  if (isSpam && member) {
+
+  if (spamPatterns.some(p => p.test(message.content))) {
     try {
       await message.delete();
-      await member.timeout(24 * 60 * 60 * 1000, 'Spam/unauthorized links');
-      console.log(`Deleted message and timed out user ${member.user.tag} for spam`);
-      return;
-    } catch (error) {
-      console.error('Error handling spam:', error);
-    }
+      await member?.timeout(86400000, 'Spam/unauthorized links');
+    } catch {}
+    return;
   }
-  
-  // Question detection - only respond to actual questions
-  const questionWords = ['how', 'what', 'when', 'where', 'why', 'can', 'is', 'do', 'does', 'will', 'which', 'who', 'could', 'would', 'should'];
+
+  // QUESTION DETECTION
+  const questionWords = [
+    'how', 'what', 'when', 'where', 'why', 'can', 'is', 'do',
+    'does', 'will', 'which', 'who', 'could', 'would', 'should'
+  ];
+
   const hasQuestionMark = message.content.includes('?');
   const hasQuestionWord = questionWords.some(word => messageContent.includes(word));
   const isLongEnough = message.content.length > 15;
-  
-  // Only respond if it's a question or substantial query
+
   if (!hasQuestionMark && !hasQuestionWord && !isLongEnough) {
-    return; // Ignore casual chat
+    return;
   }
-  
-  // ==========================================
 
   const question = message.content.trim();
-  if (!question) {
-        message.reply('Please provide a question.');
-        return;
-  }
+  if (!question) return;
 
   try {
-    // Type guard to check if channel supports sendTyping
-    if (message.channel && 'sendTyping' in message.channel) {
+    if ('sendTyping' in message.channel) {
       await message.channel.sendTyping();
     }
 
     const answer = await askOpenAI(question);
 
-      // Check if answer is uncertain or bot can't help
-  const uncertainPhrases = [
-    "i don't know",
-    "i'm not sure",
-    "i cannot",
-    "i can't",
-    "unclear",
-    "not found",
-    "no information"
-  ];
-  
-  const isUncertain = uncertainPhrases.some(phrase => answer.toLowerCase().includes(phrase));
-  const isTooShort = answer.length < 50; // Very short answers might be uncertain
-  
-  if (isUncertain || isTooShort) {
-    await message.reply("I'm not sure about this one. Let me get our moderators to help you with this! <@MODERATOR_ID_HERE>");
-    return;
+    const uncertain = ["i don't know", "i'm not sure", "cannot", "unclear", "not found"];
+    const isUncertain = uncertain.some(p => answer.toLowerCase().includes(p));
+
+    if (isUncertain || answer.length < 50) {
+      await message.reply("I'm not sure about this one. Let me get our moderators to help you with this! <@MODERATOR_ID_HERE>");
+      return;
+    }
+
+    await message.reply(`**Answer:**\n${answer}`);
+  } catch (error) {
+    console.error(error);
   }
-
-
-    const botReply = await message.reply(`**Answer:**\n${answer}}`);
-
-  }
-   catch (error) {
-             console.error('Error in messageCreate handler:', error);
-         }
 });
 
-
+/* ----------------------------------------------------
+   Connect DB + Login Bot
+---------------------------------------------------- */
 connectDB().then(() => {
   client.login(process.env.DISCORD_TOKEN);
 });
 
-// Create a simple HTTP server for Render health checks
+/* ----------------------------------------------------
+   Render Health Check Server
+---------------------------------------------------- */
 const PORT = process.env.PORT || 3000;
 const server = http.createServer((req, res) => {
   res.writeHead(200, { 'Content-Type': 'text/plain' });
@@ -195,3 +187,29 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
   console.log(`🌐 HTTP server listening on port ${PORT}`);
 });
+
+/* ----------------------------------------------------
+   ADMIN API + DYNAMIC INGEST + CRON (ADDED HERE)
+---------------------------------------------------- */
+
+const app = express();
+app.use("/admin", adminRouter);
+
+app.listen(10001, () => {
+  console.log("Admin API running on port 10001");
+});
+
+const svc = new DynamicIngestService();
+
+// run ingest on startup
+if (process.env.INGEST_ON_STARTUP === "true") {
+  svc.trigger();
+}
+
+// schedule automatic re-ingest
+if (process.env.AUTOMATIC_INGEST_MINUTES) {
+  setInterval(
+    () => svc.trigger(),
+    Number(process.env.AUTOMATIC_INGEST_MINUTES) * 60 * 1000
+  );
+}
