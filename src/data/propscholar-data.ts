@@ -308,9 +308,7 @@ async function fetchLiveData(): Promise<PropScholarAPIData | null> {
 }
 
 // Clean AI-generated response from any stray %7D or }
-export function cleanBotResponse(text: string): string {
-  return text.replace(/(%7D|\})+/g, "");
-}
+
 
 // Main prompt builder
 export async function getPropScholarData(): Promise<string> {
@@ -378,6 +376,5 @@ export {
   fetchPageContent,
   fetchAllPages,
   fetchLiveData,
-  cleanBotResponse,
   HELP_ARTICLES
 };
