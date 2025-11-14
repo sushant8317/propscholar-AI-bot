@@ -6,22 +6,22 @@
   "scripts": {
     "start": "node dist/index.js",
     "build": "tsc",
-    "dev": "ts-node src/index.ts"
-        "ingest": "ts-node src/scripts/ingest-data.ts"
+    "dev": "ts-node src/index.ts",
+    "ingest": "ts-node src/scripts/ingest-data.ts"
   },
   "dependencies": {
     "discord.js": "^14.14.1",
     "axios": "^1.6.0",
     "mongoose": "^8.0.0",
     "dotenv": "^16.3.1",
-        "cheerio": "^1.0.0-rc.12"
-        "openai": "^4.0.0"
+    "cheerio": "^1.0.0-rc.12",
+    "openai": "^4.0.0"
   },
   "devDependencies": {
     "typescript": "^5.3.0",
     "ts-node": "^10.9.1",
     "@types/node": "^20.10.0",
-        "@types/cheerio": "^0.22.35"
+    "@types/cheerio": "^0.22.35"
   },
   "engines": {
     "node": ">=18.0.0"
