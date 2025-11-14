@@ -1,5 +1,5 @@
 // ----------------------------------------------------
-// MUST LOAD ENV FIRST
+// Load ENV First
 // ----------------------------------------------------
 import dotenv from "dotenv";
 dotenv.config();
@@ -10,7 +10,8 @@ dotenv.config();
 import {
   Client,
   GatewayIntentBits,
-  Message
+  Message,
+  Partials
 } from "discord.js";
 
 import axios from "axios";
@@ -19,8 +20,10 @@ import express from "express";
 
 import adminRouter from "./controllers/admin.controller";
 import DynamicIngestService from "./services/dynamic-ingest.service";
-import { getPropScholarData } from "./data/propscholar-data";
+import { RAGService } from "./services/rag.service"; // make sure correct path
+// ----------------------------------------------------
 
+const rag = new RAGService();
 
 // ----------------------------------------------------
 // Mongo Schema
@@ -35,11 +38,10 @@ const qaSchema = new mongoose.Schema({
 
 const QA = mongoose.model("QA", qaSchema);
 
-
 // ----------------------------------------------------
 // Mongo Connection
 // ----------------------------------------------------
-const connectDB = async () => {
+async function connectDB() {
   try {
     await mongoose.connect(process.env.MONGODB_URI as string);
     console.log("✅ MongoDB connected");
@@ -47,37 +49,38 @@ const connectDB = async () => {
     console.error("❌ MongoDB error:", err);
     process.exit(1);
   }
-};
-
+}
 
 // ----------------------------------------------------
-// Discord Bot
+// Discord Client
 // ----------------------------------------------------
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMessageReactions,
-    GatewayIntentBits.DirectMessages
-  ]
+    GatewayIntentBits.MessageContent
+  ],
+  partials: [Partials.Channel]
 });
 
-
 // ----------------------------------------------------
-// Ask LLaMA (Groq API)
+// Groq Fallback Function
 // ----------------------------------------------------
-const askOpenAI = async (question: string): Promise<string> => {
+async function askGroq(question: string): Promise<string> {
   try {
-    const systemPrompt = await getPropScholarData();
-
     const response = await axios.post(
       "https://api.groq.com/openai/v1/chat/completions",
       {
         model: "llama-3.1-8b-instant",
         messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: question }
+          {
+            role: "system",
+            content: "You are PropScholar support assistant."
+          },
+          {
+            role: "user",
+            content: question
+          }
         ],
         max_tokens: 500,
         temperature: 0.7
@@ -93,10 +96,9 @@ const askOpenAI = async (question: string): Promise<string> => {
     return response.data.choices[0].message.content;
   } catch (err: any) {
     console.error("Groq API Error:", err.response?.data || err.message);
-    return "Sorry, something went wrong while processing your question.";
+    return "Something went wrong while processing your question.";
   }
-};
-
+}
 
 // ----------------------------------------------------
 // Bot Ready
@@ -105,77 +107,73 @@ client.on("ready", () => {
   console.log(`🤖 Bot logged in as ${client.user?.tag}`);
 });
 
-
 // ----------------------------------------------------
 // Message Handler
 // ----------------------------------------------------
 client.on("messageCreate", async (message: Message) => {
   if (message.author.bot) return;
 
-  const lower = message.content.toLowerCase();
+  const text = message.content.trim().toLowerCase();
+
+  const questionKeywords = ["how", "what", "why", "can", "is", "does", "when", "where"];
   const isQuestion =
     message.content.includes("?") ||
-    ["how", "what", "why", "can", "is", "does", "when", "where"].some((w) =>
-      lower.startsWith(w)
-    );
+    questionKeywords.some((w) => text.startsWith(w));
 
   if (!isQuestion) return;
 
   try {
-    const chan: any = message.channel;
-    if (chan && typeof chan.sendTyping === "function") {
-      await chan.sendTyping();
+    // SAFE TYPING FIX ✔
+    if ("sendTyping" in message.channel) {
+      await (message.channel as any).sendTyping();
     }
 
-    const answer = await askOpenAI(message.content);
-    await message.reply(`**Answer:**\n${answer}`);
+    // 1️⃣ Try RAG first
+    const ragResult = await rag.generateResponse(message.content);
+
+    if (ragResult && ragResult.answer && ragResult.confidence > 0.50) {
+      return message.reply(`**Answer:**\n${ragResult.answer}`);
+    }
+
+    // 2️⃣ Fallback: Groq LLaMA
+    const fallback = await askGroq(message.content);
+    return message.reply(`**Answer:**\n${fallback}`);
+
   } catch (err) {
-    console.error(err);
+    console.error("Message Error:", err);
   }
 });
-
 
 // ----------------------------------------------------
 // Start DB + Bot
 // ----------------------------------------------------
 connectDB().then(() => client.login(process.env.DISCORD_TOKEN));
 
-
 // ----------------------------------------------------
-// MERGED EXPRESS SERVER (REQUIRED FOR RENDER)
+// EXPRESS SERVER FOR RENDER
 // ----------------------------------------------------
 const app = express();
-
-// parse JSON for admin requests
 app.use(express.json());
-
-// Admin API routes
 app.use("/admin", adminRouter);
 
-// Health Check
-app.get("/", (req, res) => {
+app.get("/", (_, res) => {
   res.send("OK - PropScholar AI Bot Online");
 });
 
-// Render controls PORT
 const PORT = process.env.PORT || 3000;
-
 app.listen(PORT, () => {
   console.log(`🌐 Server running on port ${PORT}`);
 });
 
-
 // ----------------------------------------------------
-// DYNAMIC INGEST SERVICE
+// AUTO INGEST
 // ----------------------------------------------------
 const svc = new DynamicIngestService();
 
-// Run ingestion on startup
 if (process.env.INGEST_ON_STARTUP === "true") {
   svc.trigger();
 }
 
-// Auto re-ingest cron
 if (process.env.AUTOMATIC_INGEST_MINUTES) {
   setInterval(
     () => svc.trigger(),
