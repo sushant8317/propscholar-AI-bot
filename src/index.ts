@@ -20,13 +20,15 @@ import express from "express";
 
 import adminRouter from "./controllers/admin.controller";
 import DynamicIngestService from "./services/dynamic-ingest.service";
-import { RAGService } from "./services/rag.service"; // make sure correct path
-// ----------------------------------------------------
+import { RAGService } from "./services/rag.service";
 
+// ----------------------------------------------------
+// Initialize RAG
+// ----------------------------------------------------
 const rag = new RAGService();
 
 // ----------------------------------------------------
-// Mongo Schema
+// Mongo Schema (Optional, for logging Q/A)
 // ----------------------------------------------------
 const qaSchema = new mongoose.Schema({
   question: { type: String, required: true },
@@ -39,7 +41,7 @@ const qaSchema = new mongoose.Schema({
 const QA = mongoose.model("QA", qaSchema);
 
 // ----------------------------------------------------
-// Mongo Connection
+// DB Connection
 // ----------------------------------------------------
 async function connectDB() {
   try {
@@ -64,26 +66,41 @@ const client = new Client({
 });
 
 // ----------------------------------------------------
-// Groq Fallback Function
+// Fallback to Groq (when RAG fails)
 // ----------------------------------------------------
 async function askGroq(question: string): Promise<string> {
   try {
+    const SYSTEM_PROMPT = `
+You are the official AI assistant of PropScholar.
+You MUST answer ONLY questions related to:
+- PropScholar evaluations
+- PropScholar rules
+- Daily/DD rules
+- Inactivity rules
+- News restrictions
+- PropScholar payout system
+- PropScholar dashboard
+- PropScholar scholarship model
+
+STRICT RULES:
+- If the question is NOT about PropScholar → REFUSE.
+- Do NOT answer general trading questions.
+- Do NOT answer world knowledge or unrelated topics.
+- Reply: "I can only assist with questions related to PropScholar."
+
+Be accurate, short, clean, and based ONLY on PropScholar knowledge base.
+`;
+
     const response = await axios.post(
       "https://api.groq.com/openai/v1/chat/completions",
       {
         model: "llama-3.1-8b-instant",
         messages: [
-          {
-            role: "system",
-            content: "You are PropScholar support assistant."
-          },
-          {
-            role: "user",
-            content: question
-          }
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: question }
         ],
-        max_tokens: 500,
-        temperature: 0.7
+        max_tokens: 800,
+        temperature: 0.5
       },
       {
         headers: {
@@ -101,46 +118,51 @@ async function askGroq(question: string): Promise<string> {
 }
 
 // ----------------------------------------------------
-// Bot Ready
+// On Bot Ready
 // ----------------------------------------------------
 client.on("ready", () => {
   console.log(`🤖 Bot logged in as ${client.user?.tag}`);
 });
 
 // ----------------------------------------------------
-// Message Handler
+// Message Handler (MAIN LOGIC)
 // ----------------------------------------------------
 client.on("messageCreate", async (message: Message) => {
   if (message.author.bot) return;
 
-  const text = message.content.trim().toLowerCase();
+  const content = message.content.trim();
 
-  const questionKeywords = ["how", "what", "why", "can", "is", "does", "when", "where"];
+  // Detect question
+  const qWords = ["how", "what", "why", "can", "is", "does", "when", "where"];
   const isQuestion =
-    message.content.includes("?") ||
-    questionKeywords.some((w) => text.startsWith(w));
+    content.includes("?") ||
+    qWords.some((w) => content.toLowerCase().startsWith(w));
 
   if (!isQuestion) return;
 
   try {
-    // SAFE TYPING FIX ✔
+    // Send typing safely
     if ("sendTyping" in message.channel) {
       await (message.channel as any).sendTyping();
     }
 
-    // 1️⃣ Try RAG first
-    const ragResult = await rag.generateResponse(message.content);
+    // ----------------------------------------------------
+    // 1️⃣ RAG RESPONSE
+    // ----------------------------------------------------
+    const ragResult = await rag.generateResponse(content);
 
-    if (ragResult && ragResult.answer && ragResult.confidence > 0.50) {
+    if (ragResult.answer && ragResult.confidence > 0.55) {
       return message.reply(`**Answer:**\n${ragResult.answer}`);
     }
 
-    // 2️⃣ Fallback: Groq LLaMA
-    const fallback = await askGroq(message.content);
+    // ----------------------------------------------------
+    // 2️⃣ FALLBACK: GROQ
+    // ----------------------------------------------------
+    const fallback = await askGroq(content);
     return message.reply(`**Answer:**\n${fallback}`);
 
   } catch (err) {
-    console.error("Message Error:", err);
+    console.error("Message Handler Error:", err);
   }
 });
 
@@ -150,23 +172,19 @@ client.on("messageCreate", async (message: Message) => {
 connectDB().then(() => client.login(process.env.DISCORD_TOKEN));
 
 // ----------------------------------------------------
-// EXPRESS SERVER FOR RENDER
+// Express Server for Render
 // ----------------------------------------------------
 const app = express();
 app.use(express.json());
 app.use("/admin", adminRouter);
 
-app.get("/", (_, res) => {
-  res.send("OK - PropScholar AI Bot Online");
-});
+app.get("/", (_, res) => res.send("OK - PropScholar AI Bot Online"));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🌐 Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`🌐 Server running on port ${PORT}`));
 
 // ----------------------------------------------------
-// AUTO INGEST
+// AUTO INGEST SYSTEM
 // ----------------------------------------------------
 const svc = new DynamicIngestService();
 
