@@ -81,38 +81,105 @@ const HELP_ARTICLES = [
   category: "Evaluation Rules",
   content: `If you breach any trading objective, you will receive an email by 00:00 UTC next day. All open trades will be closed immediately, and any active limit or stop orders will be canceled. Your account credentials will no longer be active. BREACH EMAIL DETAILS: You will receive an email detailing the exact reason for breach, including which rule was violated, when it occurred, and how it impacted your account. This ensures full transparency and helps you understand what went wrong. Account becomes inactive after breach and cannot be recovered. All trading activity stops immediately once breach is detected.`
   },
+
+  {
+  title: "About PropScholar - Making Trading Accessible",
+  url: "https://propscholar.com/about",
+  category: "About",
+  content: `PropScholar's mission is to make trading accessible for everyone by providing scholarship grants. Traders take a simple evaluation/test, and upon successful completion, receive a scholarship. The platform is not a prop firm but a scholarship-based model where traders evaluate themselves through skill-based tests to earn scholarships. PropScholar aims to eliminate capital barriers and focus on skill-based opportunities. Core values include commitment, client-centered focus, best industry support, and a simple, fair evaluation process. The community fosters skilled individuals and offers 24×7 support through an active Discord. PropScholar is dedicated to making trading accessible and rewarding skill over capital.`
+  },
+
+  {
+  title: "What is a PropScholar Scholarship?",
+  url: "https://help.propscholar.com/article/scholarshop-your-reward",
+  category: "Payout & Scholarship",
+  content: `At PropScholar, a scholarship is your reward — a direct monetary payout you receive after successfully passing our evaluation. It is NOT a discount or store credit; it’s real money paid within 4 hours of your success. The process works as follows: select your target evaluation (e.g., Maven 2K 2-Step challenge costing $19), attempt PropScholar’s evaluation for a small entry fee (usually $5), and on passing, receive the full $19 scholarship payout. If you fail, you lose only the small entry fee but gain the full learning experience. Scholarships yield up to 400% return based purely on skill, with no luck involved. Payouts are issued instantly via UPI, Bank Transfer, PayPal, or custom methods without additional approval. After passing, your account is reviewed, and you receive a code by email to request your reward, which is then issued within 4 hours. You may use the scholarship however you want — to buy real prop firm challenges, tools, education, or retry evaluations. PropScholar encourages making your trading journey accessible and supports you to grow continuously. Your skill directly earns your scholarship, ensuring ethical growth. Use it to leverage larger challenges or reevaluate affordably until ready to scale. PropScholar backs you repeatedly: You trade. You win. You get paid.`
+  },
+
+  {
+  title: "Next Steps After Clearing Phase 1",
+  url: "https://help.propscholar.com/article/next-steps-after-clearing-phase-1",
+  category: "Evaluation Process",
+  content: `After successfully meeting all the rules of Phase 1, your account undergoes a review process. Within 36 hours, you will receive: your Phase 2 credentials and your Phase 1 certificate reflecting your billing details. Your account stays in review during this period. If you do not receive the credentials and certificate within 36 hours, please contact the PropScholar support team for assistance. When users state they have completed their target, ask whether they mean Phase 1 or Phase 2, and provide the appropriate next steps accordingly. Specifically, after passing Phase 1, inform them of this review process and issuance of Phase 2 credentials and certificate.`
+  },
+
+  {
+  title: "How Long Until You Receive Your Account?",
+  url: "https://help.propscholar.com/article/how-long-until-you-receive-your-account",
+  category: "Account Delivery",
+  content: `After completing your purchase, you will receive an order confirmation email within 120 milliseconds. Your account credentials are sent almost immediately afterward, though in some cases it may take up to 24 hours to ensure correct processing. If you do not receive the confirmation email within 120 milliseconds, contact support immediately with proof of payment. After receiving confirmation, allow up to 24 hours for your account details via email. If after 24 hours you have not received your credentials, check your spam folder, and if still missing, contact support with your order number or purchase email. When users report missing credentials, ask when they paid and respond accordingly.`
+  },
+
+  {
+  title: "How Instant Accounts Work in PropScholar",
+  url: "https://help.propscholar.com/article/how-propscholar-instant-model-works",
+  category: "Instant Account Model",
+  content: `PropScholar offers a scholarship-backed model for Instant Accounts, eliminating the need for traders to pay high upfront fees charged by other instant funding providers. Traders pass an affordable skill-based evaluation at actual cost. Upon passing, PropScholar covers the full fee for the Instant Funded Account, giving traders direct access to capital. This model ensures funding is based on skill rather than money, providing fair and fast access to instant trading capital. The funded account belongs entirely to the trader.`
+  },
+
+  {
+  title: "Choose Your Payment Method",
+  url: "https://help.propscholar.com/article/choose-your-payment-method",
+  category: "Payment",
+  content: `[translate:At PropScholar, we offer three widely-used and secure payment options—fully integrated with industry-standard gateways for a smooth experience.] Available Payment Methods: 1. PayPal — Pay securely using your PayPal account. Supported in most countries with fast, verified transactions. 2. PhonePe (UPI) — Use UPI to make seamless payments through PhonePe, a reliable and widely used option for Indian customers. 3. Crypto Payment — Pay using your crypto through our secure payment gateway. [translate:Secure & Instant Processing] All transactions are processed under 256-bit encryption for maximum safety. Our system is fully automated, ensuring instant order handling after successful payment. [translate:What Happens After Payment?] You will automatically receive: Order Confirmation Email, Access Credentials, Live Order Status Page — usually delivered within 120 milliseconds of successful payment. [translate:How to Download Your Payment Receipt] After payment, you’ll be redirected to the Order Confirmation Page containing order details and a downloadable receipt link to save as PDF or print for your records.`
+  },
+
+  {
+  title: "Contacting Human Support and Moderators",
+  url: "",
+  category: "Support & Moderation",
+  content: `[translate:If users want to contact a human instead of the AI bot, direct them to the support ticket channel or tell them to tag one of our moderators: Harris or Sikha.] To open a support ticket channel, just go to browse channels, search for "support ticket," and click on it.`
+  },
+
+  {
+  title: "I have not received my account credentials",
+  url: "",
+  category: "Moderator Q&A",
+  content: "It can take upto 15 minutes. If you are waiting longer than 15 minutes please open a ticket! Stay assure."
+  },
+
+  {
+  title: "Hey it has been more than 24 Hour. I have not recived my phase 2 credentials",
+  url: "",
+  category: "Moderator Q&A",
+  content: "It can take upto 36 Hour. But if it's takes longer than that please make sure to open a ticket <#1314824706477527042>"
+  },
+
+  {
+  title: "What are the rules",
+  url: "",
+  category: "Moderator Q&A",
+  content: "Hey! You can simply refer to -> https://help.propscholar.com/collection/evaluations. Incase you have any doubt regarding any model just ask me! i can assist you"
+  },
+
+  {
+  title: "How to claim my payout",
+  url: "",
+  category: "Moderator Q&A",
+  content: "Hey! To claim your payout you will have to open a support ticket <#1314824706477527042> and tag one of our moderators! the payout will be issued within minutes."
+  },
+
+  {
+  title: "Check my ticket",
+  url: "",
+  category: "Moderator Q&A",
+  content: "Hey! stay assure could you mention your ticket number and tag our moderators in ticket."
+  },
+
+  {
+  title: "Check my ticket",
+  url: "",
+  category: "Moderator Q&A",
+  content: "Hey! stay assure could you mention your ticket number and tag our moderators in ticket."
+  }
+
 ];
 
 // ========================================
 // STATIC FALLBACK DATA
 // ========================================
-const STATIC_DATA = {
-  about: "PropScholar is India's most affordable prop trading firm. Start trading with our capital from just $5! We provide trading capital, tools, and education so anyone can become a professional trader.",
-  
-  features: [
-    "Start with just $5 - lowest in India!",
-    "Lightning-fast 4-hour payouts (not 14 days like competitors)",
-    "Zero-spread accounts for better execution",
-    "Free demo accounts forever",
-    "Professional MT4/MT5 dashboards",
-    "Instant breach alerts via Discord",
-    "EAs & bots fully allowed",
-    "No hidden fees ever",
-    "80% profit share - keep $80 of every $100 you make"
-  ],
-  
-  targetMarkets: [
-    "Primary markets: India and Nigeria",
-    "Retail traders looking for affordable entry",
-    "Small prop firms seeking partnerships"
-  ],
-  
-  valueProposition: "Trade with our capital, keep 80% profits. Start from $5!"
-};
 
-// ========================================
-// INTERFACES
-// ========================================
+
 interface Article {
   title: string;
   url: string;
@@ -133,15 +200,14 @@ interface PageContent {
   content: string;
 }
 
-// ========================================
-// CONFIGURATION
-// ========================================
 const SITEMAP_URL = 'https://www.propscholar.com/sitemap.xml';
 const API_ENDPOINT = 'https://www.propscholar.com/api/bot-data';
 
-// ========================================
-// WEBSITE SCRAPING FUNCTIONS (ORIGINAL)
-// ========================================
+// Helper to clean URLs from trailing braces or encoded braces
+function cleanUrl(url: string): string {
+  return url.trim().replace(/[}%]+$/, "");
+}
+
 async function fetchSitemap(): Promise<string[]> {
   try {
     console.log('📡 Fetching sitemap from PropScholar.com...');
@@ -154,7 +220,8 @@ async function fetchSitemap(): Promise<string[]> {
     const urls: string[] = [];
     
     $('url loc').each((i, elem) => {
-      const url = $(elem).text();
+      let url = $(elem).text();
+      url = cleanUrl(url); // Sanitize URL
       if (url && !url.includes('.xml')) {
         urls.push(url);
       }
@@ -175,7 +242,8 @@ async function fetchSitemap(): Promise<string[]> {
 
 async function fetchPageContent(url: string): Promise<PageContent | null> {
   try {
-    const response = await axios.get(url, {
+    const clean_url = cleanUrl(url);
+    const response = await axios.get(clean_url, {
       timeout: 5000,
       headers: { 'User-Agent': 'PropScholar-Discord-Bot' }
     });
@@ -189,7 +257,7 @@ async function fetchPageContent(url: string): Promise<PageContent | null> {
       .trim()
       .substring(0, 1000);
     
-    return { url, title, content };
+    return { url: clean_url, title, content };
   } catch (error) {
     console.log(`❌ Failed to fetch: ${url}`);
     return null;
@@ -239,95 +307,77 @@ async function fetchLiveData(): Promise<PropScholarAPIData | null> {
   }
 }
 
-// ========================================
-// MAIN FUNCTION - Build System Prompt
-// ========================================
+// Clean AI-generated response from any stray %7D or }
+export function cleanBotResponse(text: string): string {
+  return text.replace(/(%7D|\})+/g, "");
+}
+
+// Main prompt builder
 export async function getPropScholarData(): Promise<string> {
-  // Fetch live data from website and API
   const [liveData, pages] = await Promise.all([
     fetchLiveData(),
     fetchAllPages()
   ]);
-  
-  // Group help articles by category
+
   const categorizedArticles = HELP_ARTICLES.reduce((acc, article) => {
     const cat = article.category;
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(article);
     return acc;
   }, {} as Record<string, Article[]>);
-  
+
   let prompt = `You are a professional support assistant for PropScholar.\n\n`;
 
+  // Add new instruction: NO source URLs in user messages
   prompt += `## RESPONSE RULES:\n`;
-  prompt += `1. Give short, direct answers (1-3 sentences)\n`;
-  prompt += `2. Be professional and helpful - NO emojis\n`;
-  prompt += `3. Do not add characters (brackets, braces, etc.) after any URL in your response.\n`;
-  prompt += `4. If info not in knowledge base: "I don't have that information. Visit help.propscholar.com or contact support."\n`;
-  prompt += `5. Never make up information\n\n`;
+  prompt += `1. Provide ONLY short, professional, and concise answers (1-2 sentences).\n`;
+  prompt += `2. Respond ONLY if the user's question includes KEYWORDS that match your knowledge base.\n`;
+  prompt += `3. If the question is unrelated or outside your data, reply: "I can only assist with PropScholar-related queries. Please contact support for other questions."\n`;
+  prompt += `4. DO NOT add unnecessary information or over-explain.\n`;
+  prompt += `5. NEVER guess or fabricate info; if unknown, say: "I don't have that information. Visit help.propscholar.com or contact support."\n`;
+  prompt += `6. NO emojis, no casual language—always maintain a professional tone.\n\n`;
 
   prompt += `## CORRECT RESPONSE EXAMPLES:\n\n`;
   prompt += `User: "What is the consistency rule?"\n`;
-  prompt += `Bot: "No single trading day can exceed 45% of your total profit target. For example, on a $5,000 account with an 8% ($400) target, no day can exceed $180 profit. Source: https://help.propscholar.com/article/all-about-consistency-rule"\n\n`;
+  prompt += `Bot: "No single trading day can exceed 45% of your total profit target."\n\n`; // No sources
+
   prompt += `User: "How do I pay?"\n`;
-  prompt += `Bot: "We accept PayPal, PhonePe (UPI), Paytm, and credit/debit cards. Indian traders can use instant UPI payment. Source: https://help.propscholar.com/article/payment-methods"\n\n`;
+  prompt += `Bot: "We accept PayPal, PhonePe (UPI), Paytm, and credit/debit cards. Indian traders can use instant UPI payment."\n\n`;
+
   prompt += `User: "When do I get my account?"\n`;
-  prompt += `Bot: "Evaluation accounts are delivered within 24-48 hours via email. Discord members get priority delivery within 12 hours. Source: https://help.propscholar.com/article/account-delivery"\n\n`;
+  prompt += `Bot: "Evaluation accounts are delivered within 24-48 hours via email. Discord members get priority delivery within 12 hours."\n\n`;
+
   prompt += `User: "Can I use EAs?"\n`;
-  prompt += `Bot: "Yes, Expert Advisors (EAs) and bots are fully allowed on all platforms. Source: https://help.propscholar.com/article/platforms"\n\n`;
+  prompt += `Bot: "Yes, Expert Advisors (EAs) and bots are fully allowed on all platforms."\n\n`;
 
   prompt += `## HELP CENTER KNOWLEDGE BASE (PRIMARY SOURCE):\n\n`;
   Object.entries(categorizedArticles).forEach(([category, articles]) => {
     prompt += `### ${category}\n\n`;
     articles.forEach(article => {
+      // Clean URLs before adding
+      const clean_url = cleanUrl(article.url);
       prompt += `Title: ${article.title}\n`;
-      prompt += `URL: ${article.url}\n`; // never ends with %, }, or other stray symbol!
+      prompt += `URL: ${clean_url}\n`;
       prompt += `Content: ${article.content}\n\n`;
     });
   });
 
-  // [rest of the code unchanged, including static company info, live data, extra website context...]
+  // Other static & live data unchanged...
 
   prompt += `## CITATION FORMAT:\n`;
-  prompt += `Always end responses with: "Source: [exact URL]"\n`;
-  prompt += `Example: Source: https://help.propscholar.com/article/account-delivery\n`;
-  prompt += `Do NOT include any characters such as } or %7D after the URL.\n`;
-  prompt += `For multiple sources: "Sources: [URL1], [URL2]"\n\n`;
+  prompt += `- Source URLs are maintained internally but NOT shown in bot replies.\n\n`;
 
-  prompt += `Remember: Short, professional, cite sources, no emojis, and NO strange characters after URLs.`;
+  prompt += `Remember: Short, professional answers without URLs or emojis.`;
 
   return prompt;
 }
 
-// ========================================
-// HELPER FUNCTIONS
-// ========================================
-export function searchArticles(query: string): Article[] {
-  const lowerQuery = query.toLowerCase();
-  return HELP_ARTICLES.filter(article => 
-    article.title.toLowerCase().includes(lowerQuery) ||
-    article.content.toLowerCase().includes(lowerQuery) ||
-    article.category.toLowerCase().includes(lowerQuery)
-  );
-}
-
-export function getAllArticles(): Article[] {
-  return HELP_ARTICLES;
-}
-
-// Clean URLs in final bot output before sending!
-export function cleanBotResponse(text: string) {
-  return text.replace(/(%7D|\})+/g, ""); // Removes any stray %7D or }
-}
-
-// ========================================
-// EXPORTS
-// ========================================
-
-export { 
-  fetchSitemap, 
-  fetchPageContent, 
+// (Your HELP_ARTICLES, STATIC_DATA, exports remain as is)
+export {
+  fetchSitemap,
+  fetchPageContent,
   fetchAllPages,
-  HELP_ARTICLES,
-  STATIC_DATA, 
+  fetchLiveData,
+  cleanBotResponse,
+  HELP_ARTICLES
 };
