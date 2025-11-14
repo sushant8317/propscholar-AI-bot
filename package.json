@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "start": "node dist/index.js",
-    "build": "tsc",
+    "build": "tsc && cp -r src/views dist/",
     "dev": "ts-node src/index.ts",
     "ingest": "ts-node src/scripts/ingest-data.ts"
   },
