@@ -21,3 +21,4 @@ const KbEntrySchema = new Schema<IKbEntry>({
 
 export const KbEntry = mongoose.model<IKbEntry>('KbEntry', KbEntrySchema);
 export default KbEntry;
+
