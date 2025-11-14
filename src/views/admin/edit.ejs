@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Edit KB</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #111; color: #fff; }
+        input, textarea { width: 100%; padding: 8px; margin: 10px 0; background: #222; color: #fff; border: 1px solid #444; }
+        button { padding: 10px 16px; background: #0275d8; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<h2>Edit KB Entry</h2>
+
+<form method="POST">
+    <input type="text" name="title" value="<%= item.title %>" required>
+    <textarea name="content" rows="8"><%= item.content %></textarea>
+    <input type="text" name="category" value="<%= item.category %>">
+    <input type="text" name="url" value="<%= item.url %>">
+    <button type="submit">Update</button>
+</form>
+
+</body>
+</html>

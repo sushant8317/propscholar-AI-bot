@@ -1,61 +1,64 @@
-import { Router } from "express";
+// src/controllers/admin.controller.ts
+
+import express, { Request, Response } from "express";
 import { KbEntry } from "../models/kbEntry.model";
-import DynamicIngestService from "../services/dynamic-ingest.service";
 
-const router = Router();
+const router = express.Router();
 
-// ----------------------------------------------------
-// POST KB ENTRY
-// ----------------------------------------------------
-router.post("/kb", async (req, res) => {
+// ===========================
+// GET all KB entries
+// ===========================
+router.get("/kb", async (req: Request, res: Response) => {
+  const docs = await KbEntry.find().lean();
+  res.json({ ok: true, count: docs.length, docs });
+});
+
+// ===========================
+// CREATE KB entry
+// ===========================
+router.post("/kb", async (req: Request, res: Response) => {
   try {
-    if (req.headers["x-admin-key"] !== process.env.ADMIN_KEY) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+    const { title, content, category, url } = req.body;
 
-    const entry = new KbEntry(req.body);
-    await entry.save();
+    const entry = await KbEntry.create({
+      title,
+      content,
+      category,
+      url
+    });
 
-    return res.json({ ok: true });
+    res.json({ ok: true, entry });
   } catch (err) {
-    console.error("KB Save Error:", err);
-    return res.status(500).json({ error: "Failed to save KB entry" });
+    res.status(500).json({ ok: false, error: err });
   }
 });
 
-// ----------------------------------------------------
-// GET KB ENTRIES
-// ----------------------------------------------------
-router.get("/kb", async (req, res) => {
+// ===========================
+// DELETE KB entry
+// ===========================
+router.delete("/kb/:id", async (req: Request, res: Response) => {
   try {
-    if (req.headers["x-admin-key"] !== process.env.ADMIN_KEY) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    const docs = await KbEntry.find();
-    return res.json({ ok: true, count: docs.length, docs });
+    await KbEntry.findByIdAndDelete(req.params.id);
+    res.json({ ok: true });
   } catch (err) {
-    console.error("KB Fetch Error:", err);
-    return res.status(500).json({ error: "Failed to fetch KB entries" });
+    res.status(500).json({ ok: false, error: err });
   }
 });
 
-// ----------------------------------------------------
-// TRIGGER INGEST
-// ----------------------------------------------------
-router.post("/ingest/trigger", async (req, res) => {
+// ===========================
+// UPDATE KB entry
+// ===========================
+router.put("/kb/:id", async (req: Request, res: Response) => {
   try {
-    if (req.headers["x-admin-key"] !== process.env.ADMIN_KEY) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
+    const updated = await KbEntry.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
 
-    const svc = new DynamicIngestService();
-    svc.trigger();
-
-    return res.json({ ok: true });
+    res.json({ ok: true, updated });
   } catch (err) {
-    console.error("Ingest Error:", err);
-    return res.status(500).json({ error: "Ingest failed" });
+    res.status(500).json({ ok: false, error: err });
   }
 });
 

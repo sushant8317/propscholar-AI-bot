@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add KB</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #111; color: #fff; }
+        input, textarea { width: 100%; padding: 8px; margin: 10px 0; background: #222; color: #fff; border: 1px solid #444; }
+        button { padding: 10px 16px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<h2>Add New KB Entry</h2>
+
+<form method="POST">
+    <input type="text" name="title" placeholder="Title" required>
+    <textarea name="content" rows="8" placeholder="Content" required></textarea>
+    <input type="text" name="category" placeholder="Category">
+    <input type="text" name="url" placeholder="URL (optional)">
+    <button type="submit">Save</button>
+</form>
+
+</body>
+</html>

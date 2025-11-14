@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PropScholar Admin Panel</title>
+    <style>
+        body { font-family: Arial; padding: 20px; background: #111; color: #fff; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 10px; border-bottom: 1px solid #333; }
+        a.button { padding: 8px 14px; background: #4CAF50; color: white; text-decoration: none; border-radius: 5px; }
+        .delete { background: #d9534f; }
+        .edit { background: #0275d8; }
+    </style>
+</head>
+<body>
+
+<h2>PropScholar KB Dashboard</h2>
+
+<a class="button" href="/admin-panel/new">➕ Add New KB</a>
+
+<table>
+    <tr>
+        <th>Title</th>
+        <th>Category</th>
+        <th>Actions</th>
+    </tr>
+
+    <% docs.forEach(d => { %>
+    <tr>
+        <td><%= d.title %></td>
+        <td><%= d.category %></td>
+        <td>
+            <a class="button edit" href="/admin-panel/edit/<%= d._id %>">Edit</a>
+            <a class="button delete" href="/admin-panel/delete/<%= d._id %>">Delete</a>
+        </td>
+    </tr>
+    <% }) %>
+</table>
+
+</body>
+</html>
