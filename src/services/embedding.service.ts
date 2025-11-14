@@ -1,43 +1,54 @@
 // src/services/embedding.service.ts
-import OpenAI from "openai";
+import axios from "axios";
 
-export default class EmbeddingService {
-  private client: OpenAI;
-
-  constructor() {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new Error("❌ OPENAI_API_KEY missing in .env");
-
-    this.client = new OpenAI({ apiKey });
-  }
-
-  // Create ONE embedding
-  async embed(text: string): Promise<number[]> {
-    try {
-      const res = await this.client.embeddings.create({
+/**
+ * Create embedding for one text
+ */
+export async function EmbedText(text: string): Promise<number[]> {
+  try {
+    const response = await axios.post(
+      "https://api.groq.com/openai/v1/embeddings",
+      {
         model: process.env.EMBEDDING_MODEL || "text-embedding-3-small",
         input: text
-      });
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
 
-      return res.data[0].embedding;
-    } catch (error) {
-      console.error("❌ Embedding error:", error);
-      return [];
-    }
+    return response.data.data[0].embedding;
+  } catch (err: any) {
+    console.error("❌ EmbedText Error:", err.response?.data || err.message);
+    return [];
   }
+}
 
-  // Create MANY embeddings (batch)
-  async embedBatch(texts: string[]): Promise<number[][]> {
-    try {
-      const res = await this.client.embeddings.create({
+/**
+ * Embedding for many texts
+ */
+export async function EmbedBatch(texts: string[]): Promise<number[][]> {
+  try {
+    const response = await axios.post(
+      "https://api.groq.com/openai/v1/embeddings",
+      {
         model: process.env.EMBEDDING_MODEL || "text-embedding-3-small",
         input: texts
-      });
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
 
-      return res.data.map((d: any) => d.embedding);
-    } catch (error) {
-      console.error("❌ Batch Embedding error:", error);
-      return texts.map(() => []);
-    }
+    return response.data.data.map((i: any) => i.embedding);
+  } catch (err: any) {
+    console.error("❌ Batch Embedding Error:", err.response?.data || err.message);
+    return texts.map(() => []);
   }
 }

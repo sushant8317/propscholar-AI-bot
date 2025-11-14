@@ -1,7 +1,6 @@
-// src/services/dynamic-ingest.service.ts
 import { KbEntry } from '../models/kbEntry.model';
 import { HELP_ARTICLES, fetchSitemap, fetchPageContent } from '../data/propscholar-data';
-import EmbeddingService from './embedding.service';
+import { EmbedBatch } from './embedding.service';
 import { VectorService } from './vector.service';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
@@ -12,22 +11,16 @@ const BATCH_SIZE = Number(process.env.INGEST_BATCH_SIZE || 20);
 const WAIT_MS_AFTER_BATCH = Number(process.env.INGEST_WAIT_MS || 1000);
 
 export class DynamicIngestService {
-  embeddingService: EmbeddingService;
   vectorService: VectorService;
 
   constructor() {
-    this.embeddingService = new EmbeddingService();
     this.vectorService = new VectorService();
   }
 
   async buildDataItems() {
     const items: any[] = [];
 
-    // =======================
-    // 1. Manual KB entries
-    // =======================
     const manualEntries = await KbEntry.find().lean();
-
     manualEntries.forEach((m: any) => {
       const id = `manual:${String(m._id)}`;
       const content = `Q: ${m.title}\nA: ${m.content}`;
@@ -45,9 +38,6 @@ export class DynamicIngestService {
       });
     });
 
-    // =======================
-    // 2. HELP ARTICLES
-    // =======================
     HELP_ARTICLES.forEach((a: any, idx: number) => {
       const id = `help:${idx}`;
       const content = `Q: ${a.title}\nA: ${a.content}`;
@@ -64,9 +54,6 @@ export class DynamicIngestService {
       });
     });
 
-    // =======================
-    // 3. SITEMAP PAGES
-    // =======================
     try {
       const urls = await fetchSitemap();
 
@@ -103,7 +90,7 @@ export class DynamicIngestService {
       const batch = items.slice(i, i + BATCH_SIZE);
       const texts = batch.map(b => b.content);
 
-      const embeddings = await this.embeddingService.embedBatch(texts);
+      const embeddings = await EmbedBatch(texts);
 
       for (let j = 0; j < batch.length; j++) {
         await this.vectorService.upsertEmbedding(

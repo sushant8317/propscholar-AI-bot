@@ -1,54 +1,62 @@
-// src/controllers/admin.controller.ts
-import express from 'express';
-import bodyParser from 'body-parser';
-import helmet from 'helmet';
-import dotenv from 'dotenv';
-import mongoose from 'mongoose';
-import DynamicIngestService from '../services/dynamic-ingest.service';
-import { KbEntry } from '../models/kbEntry.model';
+import { Router } from "express";
+import { KbEntry } from "../models/kbEntry.model";
+import DynamicIngestService from "../services/dynamic-ingest.service";
 
-dotenv.config();
+const router = Router();
 
-const router = express.Router();
-router.use(bodyParser.json());
-router.use(helmet());
-
-// middleware: simple token auth
-function requireApiKey(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const key = req.headers['x-admin-key'] || req.query.key || req.headers['authorization'];
-  if (!key || String(key) !== process.env.ADMIN_API_KEY) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  next();
-}
-
-// Add KB entry
-router.post('/kb', requireApiKey, async (req, res) => {
+// ----------------------------------------------------
+// POST KB ENTRY
+// ----------------------------------------------------
+router.post("/kb", async (req, res) => {
   try {
-    const { title, url, category, content, sourceId } = req.body;
-    if (!title || !content) return res.status(400).json({ error: 'title and content required' });
+    if (req.headers["x-admin-key"] !== process.env.ADMIN_KEY) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
 
-    const doc = new KbEntry({ title, url, category, content, sourceId });
-    await doc.save();
-    return res.json({ ok: true, id: doc._id });
+    const entry = new KbEntry(req.body);
+    await entry.save();
+
+    return res.json({ ok: true });
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'save failed' });
+    console.error("KB Save Error:", err);
+    return res.status(500).json({ error: "Failed to save KB entry" });
   }
 });
 
-// list KB
-router.get('/kb', requireApiKey, async (_req, res) => {
-  const docs = await KbEntry.find().sort({ createdAt: -1 }).limit(500).lean().exec();
-  res.json({ ok: true, count: docs.length, docs });
+// ----------------------------------------------------
+// GET KB ENTRIES
+// ----------------------------------------------------
+router.get("/kb", async (req, res) => {
+  try {
+    if (req.headers["x-admin-key"] !== process.env.ADMIN_KEY) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const docs = await KbEntry.find();
+    return res.json({ ok: true, count: docs.length, docs });
+  } catch (err) {
+    console.error("KB Fetch Error:", err);
+    return res.status(500).json({ error: "Failed to fetch KB entries" });
+  }
 });
 
-// manual trigger ingest
-router.post('/ingest/trigger', requireApiKey, async (_req, res) => {
-  const svc = new DynamicIngestService();
-  svc.trigger()
-    .then(() => res.json({ ok: true }))
-    .catch(err => res.status(500).json({ ok: false, error: String(err) }));
+// ----------------------------------------------------
+// TRIGGER INGEST
+// ----------------------------------------------------
+router.post("/ingest/trigger", async (req, res) => {
+  try {
+    if (req.headers["x-admin-key"] !== process.env.ADMIN_KEY) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const svc = new DynamicIngestService();
+    svc.trigger();
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("Ingest Error:", err);
+    return res.status(500).json({ error: "Ingest failed" });
+  }
 });
 
 export default router;

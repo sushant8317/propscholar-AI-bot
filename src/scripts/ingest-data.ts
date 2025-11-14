@@ -2,7 +2,7 @@
 
 import mongoose from "mongoose";
 import { getPropScholarData } from "../data/propscholar-data";
-import EmbeddingService from "../services/embedding.service";
+import { EmbedBatch } from "../services/embedding.service";
 import { VectorService } from "../services/vector.service";
 import dotenv from "dotenv";
 
@@ -13,9 +13,7 @@ async function ingestData() {
     await mongoose.connect(process.env.MONGODB_URI!);
     console.log("Connected to MongoDB");
 
-    const embedding = new EmbeddingService();
     const vector = new VectorService();
-
     const dataset = getPropScholarData();
     const items: any[] = [];
 
@@ -24,6 +22,7 @@ async function ingestData() {
 
       arr.forEach((item: any) => {
         const content = `Q: ${item.question}\nA: ${item.answer}`;
+
         items.push({
           content,
           metadata: {
@@ -41,13 +40,20 @@ async function ingestData() {
 
     for (let i = 0; i < items.length; i += BATCH) {
       const batch = items.slice(i, i + BATCH);
-
       const texts = batch.map(b => b.content);
-      const embeddings = await embedding.embedBatch(texts);
 
-      for (let j = 0; j < batch.length; j++) {
-        await vector.storeEmbedding(batch[j].content, embeddings[j], batch[j].metadata);
-      }
+      const embeddings = await EmbedBatch(texts);
+
+for (let j = 0; j < batch.length; j++) {
+await vector.upsertEmbedding(
+  `ingest:${i}-${j}`,      // unique ID for each entry
+  batch[j].content,        // text content
+  embeddings[j],           // vector
+  batch[j].metadata        // metadata
+);
+
+}
+
 
       console.log(`Processed ${i + batch.length} / ${items.length}`);
       await new Promise(res => setTimeout(res, 1000));

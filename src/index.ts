@@ -1,12 +1,8 @@
-// ----------------------------------------------------
-// Load ENV First
-// ----------------------------------------------------
+// src/index.ts
+
 import dotenv from "dotenv";
 dotenv.config();
 
-// ----------------------------------------------------
-// Imports
-// ----------------------------------------------------
 import {
   Client,
   GatewayIntentBits,
@@ -22,27 +18,9 @@ import adminRouter from "./controllers/admin.controller";
 import DynamicIngestService from "./services/dynamic-ingest.service";
 import { RAGService } from "./services/rag.service";
 
-// ----------------------------------------------------
-// Initialize RAG
-// ----------------------------------------------------
 const rag = new RAGService();
 
-// ----------------------------------------------------
-// Mongo Schema (Optional, for logging Q/A)
-// ----------------------------------------------------
-const qaSchema = new mongoose.Schema({
-  question: { type: String, required: true },
-  answer: { type: String, required: true },
-  userId: { type: String, required: true },
-  username: { type: String, required: true },
-  timestamp: { type: Date, default: Date.now }
-});
-
-const QA = mongoose.model("QA", qaSchema);
-
-// ----------------------------------------------------
-// DB Connection
-// ----------------------------------------------------
+// ------------------- MongoDB -------------------
 async function connectDB() {
   try {
     await mongoose.connect(process.env.MONGODB_URI as string);
@@ -53,9 +31,7 @@ async function connectDB() {
   }
 }
 
-// ----------------------------------------------------
-// Discord Client
-// ----------------------------------------------------
+// ------------------- Discord -------------------
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -65,42 +41,56 @@ const client = new Client({
   partials: [Partials.Channel]
 });
 
-// ----------------------------------------------------
-// Fallback to Groq (when RAG fails)
-// ----------------------------------------------------
+// ---------------- STRICT PROPSCHOLAR MODE ----------------
+function isPropScholarRelated(text: string) {
+  const keywords = [
+    "propscholar",
+    "evaluation",
+    "phase",
+    "instant account",
+    "daily loss",
+    "max loss",
+    "scholar phase",
+    "examinee phase",
+    "consistency rule",
+    "drawdown",
+    "eligibility",
+    "prop firm",
+    "challenge rules",
+    "news rule",
+    "profit target",
+    "scholar",
+    "plus model",
+    "funded",
+    "scalping rule",
+  ];
+
+  text = text.toLowerCase();
+
+  // If any keyword matched → accept
+  return keywords.some(k => text.includes(k));
+}
+
+// ------------------- External Fallback -------------------
 async function askGroq(question: string): Promise<string> {
   try {
-    const SYSTEM_PROMPT = `
-You are the official AI assistant of PropScholar.
-You MUST answer ONLY questions related to:
-- PropScholar evaluations
-- PropScholar rules
-- Daily/DD rules
-- Inactivity rules
-- News restrictions
-- PropScholar payout system
-- PropScholar dashboard
-- PropScholar scholarship model
-
-STRICT RULES:
-- If the question is NOT about PropScholar → REFUSE.
-- Do NOT answer general trading questions.
-- Do NOT answer world knowledge or unrelated topics.
-- Reply: "I can only assist with questions related to PropScholar."
-
-Be accurate, short, clean, and based ONLY on PropScholar knowledge base.
-`;
-
     const response = await axios.post(
       "https://api.groq.com/openai/v1/chat/completions",
       {
         model: "llama-3.1-8b-instant",
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: question }
+          {
+            role: "system",
+            content:
+              "You are a PropScholar-only AI. You must never answer general questions. If user asks unrelated topic, respond with: 'I can only help with PropScholar related questions.'"
+          },
+          {
+            role: "user",
+            content: question
+          }
         ],
-        max_tokens: 800,
-        temperature: 0.5
+        max_tokens: 300,
+        temperature: 0.6
       },
       {
         headers: {
@@ -110,91 +100,77 @@ Be accurate, short, clean, and based ONLY on PropScholar knowledge base.
       }
     );
 
-    return response.data.choices[0].message.content;
+    return response.data.choices[0].message.content.trim();
   } catch (err: any) {
-    console.error("Groq API Error:", err.response?.data || err.message);
-    return "Something went wrong while processing your question.";
+    return "Something went wrong.";
   }
 }
 
-// ----------------------------------------------------
-// On Bot Ready
-// ----------------------------------------------------
+// ------------------- Bot Ready -------------------
 client.on("ready", () => {
   console.log(`🤖 Bot logged in as ${client.user?.tag}`);
 });
 
-// ----------------------------------------------------
-// Message Handler (MAIN LOGIC)
-// ----------------------------------------------------
+// ------------------- Message Handler -------------------
 client.on("messageCreate", async (message: Message) => {
   if (message.author.bot) return;
 
-  const content = message.content.trim();
+  const text = message.content.toLowerCase().trim();
 
-  // Detect question
-  const qWords = ["how", "what", "why", "can", "is", "does", "when", "where"];
+  // User sends random message like "bro", "hi"
   const isQuestion =
-    content.includes("?") ||
-    qWords.some((w) => content.toLowerCase().startsWith(w));
+    text.includes("?") ||
+    ["how", "what", "why", "can", "is", "does", "when", "where"]
+      .some(w => text.startsWith(w));
 
   if (!isQuestion) return;
 
+  // ❌ Reject non-PropScholar questions
+  if (!isPropScholarRelated(text)) {
+    return message.reply(
+      "**I can only assist with PropScholar-related questions.**\nAsk me anything about rules, phases, payouts, drawdowns, challenges, or account activation."
+    );
+  }
+
   try {
-    // Send typing safely
     if ("sendTyping" in message.channel) {
       await (message.channel as any).sendTyping();
     }
 
-    // ----------------------------------------------------
-    // 1️⃣ RAG RESPONSE
-    // ----------------------------------------------------
-    const ragResult = await rag.generateResponse(content);
+    // 1 — Try RAG
+    const ragResult = await rag.generateResponse(message.content);
 
-    if (ragResult.answer && ragResult.confidence > 0.55) {
+    if (ragResult.answer && ragResult.confidence > 0.45) {
       return message.reply(`**Answer:**\n${ragResult.answer}`);
     }
 
-    // ----------------------------------------------------
-    // 2️⃣ FALLBACK: GROQ
-    // ----------------------------------------------------
-    const fallback = await askGroq(content);
+    // 2 — Groq fallback
+    const fallback = await askGroq(message.content);
     return message.reply(`**Answer:**\n${fallback}`);
 
   } catch (err) {
-    console.error("Message Handler Error:", err);
+    console.error(err);
   }
 });
 
-// ----------------------------------------------------
-// Start DB + Bot
-// ----------------------------------------------------
+// ------------------- Start Bot -------------------
 connectDB().then(() => client.login(process.env.DISCORD_TOKEN));
 
-// ----------------------------------------------------
-// Express Server for Render
-// ----------------------------------------------------
+// ------------------- Express (Render) -------------------
 const app = express();
 app.use(express.json());
 app.use("/admin", adminRouter);
 
-app.get("/", (_, res) => res.send("OK - PropScholar AI Bot Online"));
+app.get("/", (_, res) => {
+  res.send("OK - PropScholar AI Online");
+});
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🌐 Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🌍 Server running on port ${PORT}`));
 
-// ----------------------------------------------------
-// AUTO INGEST SYSTEM
-// ----------------------------------------------------
+// ------------------- Auto Ingest -------------------
 const svc = new DynamicIngestService();
-
-if (process.env.INGEST_ON_STARTUP === "true") {
-  svc.trigger();
-}
-
-if (process.env.AUTOMATIC_INGEST_MINUTES) {
-  setInterval(
-    () => svc.trigger(),
-    Number(process.env.AUTOMATIC_INGEST_MINUTES) * 60 * 1000
-  );
-}
+if (process.env.INGEST_ON_STARTUP === "true") svc.trigger();
+if (process.env.AUTOMATIC_INGEST_MINUTES)
+  setInterval(() => svc.trigger(),
+    Number(process.env.AUTOMATIC_INGEST_MINUTES) * 60 * 1000);
