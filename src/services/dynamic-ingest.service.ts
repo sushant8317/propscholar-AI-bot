@@ -1,29 +1,17 @@
 // src/services/dynamic-ingest.service.ts
 
-import { KbEntry, IKbEntry } from '../models/kbEntry.model';
-import {
-  HELP_ARTICLES,
-  fetchSitemap,
-  fetchPageContent
-} from '../data/propscholar-data';
-
+import { KbEntry } from '../models/kbEntry.model';
+import { HELP_ARTICLES, fetchSitemap, fetchPageContent } from '../data/propscholar-data';
 import { EmbeddingService } from './embedding.service';
 import { VectorService } from './vector.service';
-
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 
 dotenv.config();
 
-// Config
+// CONFIG
 const BATCH_SIZE = Number(process.env.INGEST_BATCH_SIZE || 20);
 const WAIT_MS_AFTER_BATCH = Number(process.env.INGEST_WAIT_MS || 1000);
-
-interface DataItem {
-  id: string;
-  content: string;
-  metadata: any;
-}
 
 export class DynamicIngestService {
   embeddingService: EmbeddingService;
@@ -34,19 +22,19 @@ export class DynamicIngestService {
     this.vectorService = new VectorService();
   }
 
-  // ---------------------------------------------------------
-  // BUILD ITEMS TO INDEX
-  // ---------------------------------------------------------
-  async buildDataItems(): Promise<DataItem[]> {
-    const items: DataItem[] = [];
+  // Build ALL KB data (manual DB + help articles + sitemap)
+  async buildDataItems(): Promise<Array<{ id: string; content: string; metadata: any }>> {
+    const items: Array<{ id: string; content: string; metadata: any }> = [];
 
-    // -------------------------------------
-    // 1. Manual KB from database
-    // -------------------------------------
+    // ============================================
+    // 1) MANUAL KB ENTRIES (DB)
+    // ============================================
     const manualEntries = await KbEntry.find().lean().exec();
-    manualEntries.forEach((m: IKbEntry) => {
-      const id = `manual:${m._id.toString()}`;
+
+    manualEntries.forEach((m: any) => {
+      const id = `manual:${String(m._id)}`;
       const content = `Q: ${m.title}\nA: ${m.content}`;
+
       items.push({
         id,
         content,
@@ -60,12 +48,13 @@ export class DynamicIngestService {
       });
     });
 
-    // -------------------------------------
-    // 2. HELP_ARTICLES inside code
-    // -------------------------------------
-    HELP_ARTICLES.forEach((a: any, idx: number) => {
+    // ============================================
+    // 2) HELP_ARTICLES (from propscholar-data.ts)
+    // ============================================
+    (HELP_ARTICLES || []).forEach((a: any, idx: number) => {
       const id = `help_article:${idx}:${(a.title || '').slice(0, 50)}`;
       const content = `Q: ${a.title}\nA: ${a.content}`;
+
       items.push({
         id,
         content,
@@ -73,15 +62,15 @@ export class DynamicIngestService {
           source: 'help_articles',
           sourceId: id,
           title: a.title,
-          category: a.category,
-          url: a.url
+          url: a.url,
+          category: a.category
         }
       });
     });
 
-    // -------------------------------------
-    // 3. Sitemap pages (live scraping)
-    // -------------------------------------
+    // ============================================
+    // 3) WEBSITE SITEMAP PAGES
+    // ============================================
     try {
       const urls = await fetchSitemap();
 
@@ -103,33 +92,33 @@ export class DynamicIngestService {
           }
         });
       }
-    } catch (err) {
-      console.warn('⚠️ Failed to fetch sitemap pages:', err);
+    } catch (e) {
+      console.warn('⚠️ Sitemap fetch failed:', e);
     }
 
     return items;
   }
 
-  // ---------------------------------------------------------
-  // INGEST EVERYTHING → VECTOR DB
-  // ---------------------------------------------------------
+  // ============================================
+  // INGEST EVERYTHING INTO VECTOR DB (UPSERT)
+  // ============================================
   async ingestAll() {
     const items = await this.buildDataItems();
-    console.log(`[ingest] Found ${items.length} items to index`);
+
+    console.log(`[ingest] Total items to index: ${items.length}`);
 
     for (let i = 0; i < items.length; i += BATCH_SIZE) {
       const batch = items.slice(i, i + BATCH_SIZE);
       const texts = batch.map(b => b.content);
 
-      // 1. Create embeddings for the batch
+      // Create embeddings for batch
       const embeddings = await this.embeddingService.createBatchEmbeddings(texts);
 
-      // 2. Store or Upsert each
       for (let j = 0; j < batch.length; j++) {
         const item = batch[j];
         const embedding = embeddings[j];
 
-        // Use upsert if available to avoid duplicates
+        // Use upsert if exists
         if (typeof this.vectorService.upsertEmbedding === 'function') {
           await this.vectorService.upsertEmbedding(
             item.id,
@@ -138,7 +127,7 @@ export class DynamicIngestService {
             item.metadata
           );
         } else {
-          // fallback (static mode)
+          // fallback — creates duplicates
           await this.vectorService.storeEmbedding(
             item.content,
             embedding,
@@ -147,31 +136,23 @@ export class DynamicIngestService {
         }
       }
 
-      console.log(
-        `[ingest] Processed ${
-          Math.min(i + BATCH_SIZE, items.length)
-        } / ${items.length}`
-      );
-
-      await new Promise(res => setTimeout(res, WAIT_MS_AFTER_BATCH));
+      console.log(`[ingest] Indexed ${Math.min(i + BATCH_SIZE, items.length)} / ${items.length}`);
+      await new Promise(resolve => setTimeout(resolve, WAIT_MS_AFTER_BATCH));
     }
 
-    console.log('[ingest] Ingestion complete!');
+    console.log('[ingest] COMPLETE');
   }
 
-  // ---------------------------------------------------------
-  // PUBLIC trigger() FOR RENDER JOB
-  // ---------------------------------------------------------
+  // Trigger ingest on demand
   async trigger() {
     try {
-      // Ensure MongoDB connected
       if (mongoose.connection.readyState !== 1) {
         await mongoose.connect(process.env.MONGODB_URI!);
       }
 
       await this.ingestAll();
     } catch (err) {
-      console.error('🚨 Ingest failed:', err);
+      console.error('❌ Ingest failed:', err);
       throw err;
     }
   }
