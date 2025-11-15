@@ -13,8 +13,11 @@ import {
 import axios from "axios";
 import mongoose from "mongoose";
 import express from "express";
+import path from "path";
+import basicAuth from "express-basic-auth";
 
 import adminRouter from "./controllers/admin.controller";
+import adminUIRouter from "./controllers/admin-ui.controller";
 import DynamicIngestService from "./services/dynamic-ingest.service";
 import { RAGService } from "./services/rag.service";
 
@@ -159,6 +162,18 @@ connectDB().then(() => client.login(process.env.DISCORD_TOKEN));
 // ------------------- Express (Render) -------------------
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// View Engine
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views"));
+
+// Basic Auth for admin UI
+const authMiddleware = basicAuth({
+  users: { admin: process.env.ADMIN_PASSWORD || "propscholar2069" },
+  challenge: true
+});
+app.use("/admin", authMiddleware, adminUIRouter);
 app.use("/admin", adminRouter);
 
 app.get("/", (_, res) => {
