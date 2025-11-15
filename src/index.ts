@@ -69,13 +69,11 @@ function isPropScholarRelated(text: string) {
   ];
 
   text = text.toLowerCase();
-
-  // If any keyword matched → accept
   return keywords.some(k => text.includes(k));
 }
 
-// ------------------- External Fallback -------------------
-async function askGroq(question: string): Promise<string> {
+// ------------------- Universal LLM Wrapper -------------------
+async function askGroq(prompt: string): Promise<string> {
   try {
     const response = await axios.post(
       "https://api.groq.com/openai/v1/chat/completions",
@@ -84,15 +82,17 @@ async function askGroq(question: string): Promise<string> {
         messages: [
           {
             role: "system",
-            content:
-              "You are a PropScholar-only AI. You must never answer general questions. If user asks unrelated topic, respond with: 'I can only help with PropScholar related questions.'"
+            content: `You are a PropScholar support assistant.
+Speak naturally like a human moderator. Keep the tone calm, friendly, and clear.
+Use short sentences. Do not sound robotic.
+Explain simply and ask clarifying questions if needed.`
           },
           {
             role: "user",
-            content: question
+            content: prompt
           }
         ],
-        max_tokens: 300,
+        max_tokens: 350,
         temperature: 0.6
       },
       {
@@ -104,7 +104,7 @@ async function askGroq(question: string): Promise<string> {
     );
 
     return response.data.choices[0].message.content.trim();
-  } catch (err: any) {
+  } catch {
     return "Something went wrong.";
   }
 }
@@ -120,7 +120,6 @@ client.on("messageCreate", async (message: Message) => {
 
   const text = message.content.toLowerCase().trim();
 
-  // User sends random message like "bro", "hi"
   const isQuestion =
     text.includes("?") ||
     ["how", "what", "why", "can", "is", "does", "when", "where"]
@@ -128,7 +127,6 @@ client.on("messageCreate", async (message: Message) => {
 
   if (!isQuestion) return;
 
-  // ❌ Reject non-PropScholar questions
   if (!isPropScholarRelated(text)) {
     return message.reply(
       "**I can only assist with PropScholar-related questions.**\nAsk me anything about rules, phases, payouts, drawdowns, challenges, or account activation."
@@ -140,19 +138,31 @@ client.on("messageCreate", async (message: Message) => {
       await (message.channel as any).sendTyping();
     }
 
-    // 1 — Try RAG
+    // -------- RAG Retrieval --------
     const ragResult = await rag.generateResponse(message.content);
 
-    if (ragResult.answer && ragResult.confidence > 0.45) {
-      return message.reply(`**Answer:**\n${ragResult.answer}`);
-    }
+    // Combine behaviour + RAG context + User Query
+    const llmPrompt = `
+Behaviour:
+${ragResult.behaviour}
 
-    // 2 — Groq fallback
-    const fallback = await askGroq(message.content);
-    return message.reply(`**Answer:**\n${fallback}`);
+Context (Knowledge Base):
+${ragResult.answer || "No matching data found."}
+
+User Question:
+${message.content}
+
+Generate a helpful, short, human-style reply using the behaviour tone.
+`;
+
+    // -------- Ask LLM --------
+    const response = await askGroq(llmPrompt);
+
+    return message.reply(`**Answer:**\n${response}`);
 
   } catch (err) {
     console.error(err);
+    return message.reply("Something went wrong.");
   }
 });
 
@@ -164,11 +174,9 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// View Engine
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
-// Basic Auth for admin UI
 const authMiddleware = basicAuth({
   users: { admin: process.env.ADMIN_PASSWORD || "propscholar2069" },
   challenge: true
@@ -180,10 +188,9 @@ app.get("/", (_, res) => {
   res.send("OK - PropScholar AI Online");
 });
 
-// Bot Status endpoint
 app.get("/admin/bot-status", (_, res) => {
-  res.json({ 
-    isOnline: client.isReady(), 
+  res.json({
+    isOnline: client.isReady(),
     botTag: client.user?.tag || "Not logged in"
   });
 });
