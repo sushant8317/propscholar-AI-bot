@@ -1,24 +1,67 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" data-theme="dark">
 <head>
-    <title>Add KB</title>
-    <style>
-        body { font-family: Arial; padding: 20px; background: #111; color: #fff; }
-        input, textarea { width: 100%; padding: 8px; margin: 10px 0; background: #222; color: #fff; border: 1px solid #444; }
-        button { padding: 10px 16px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add New KB</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.24/dist/full.min.css" rel="stylesheet">
 </head>
-<body>
+<body class="bg-base-200">
+    <div class="navbar bg-base-100 shadow-xl">
+        <div class="flex-1">
+            <a href="/admin-panel" class="btn btn-ghost text-xl">← Back to Dashboard</a>
+        </div>
+    </div>
 
-<h2>Add New KB Entry</h2>
+    <div class="container mx-auto p-6 max-w-4xl">
+        <div class="card bg-base-100 shadow-2xl">
+            <div class="card-body">
+                <h2 class="card-title text-3xl mb-6">✨ Add New Knowledge Base Entry</h2>
+                
+                <form method="POST" class="space-y-6">
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text font-semibold text-lg">Title</span>
+                        </label>
+                        <input type="text" name="title" placeholder="Enter KB title..." class="input input-bordered input-primary w-full" required>
+                    </div>
 
-<form method="POST">
-    <input type="text" name="title" placeholder="Title" required>
-    <textarea name="content" rows="8" placeholder="Content" required></textarea>
-    <input type="text" name="category" placeholder="Category">
-    <input type="text" name="url" placeholder="URL (optional)">
-    <button type="submit">Save</button>
-</form>
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text font-semibold text-lg">Category</span>
+                        </label>
+                        <select name="category" class="select select-bordered select-primary w-full" required>
+                            <option disabled selected>Choose category</option>
+                            <option>Why PropScholar</option>
+                            <option>Evaluations</option>
+                            <option>PropScholar Essentials</option>
+                            <option>Trading Rules</option>
+                            <option>FAQ</option>
+                        </select>
+                    </div>
 
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text font-semibold text-lg">Content</span>
+                        </label>
+                        <textarea name="content" rows="10" placeholder="Enter detailed content..." class="textarea textarea-bordered textarea-primary w-full" required></textarea>
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text font-semibold text-lg">Source URL (Optional)</span>
+                        </label>
+                        <input type="url" name="url" placeholder="https://..." class="input input-bordered w-full">
+                    </div>
+
+                    <div class="card-actions justify-end mt-6">
+                        <a href="/admin-panel" class="btn btn-ghost">Cancel</a>
+                        <button type="submit" class="btn btn-success">✅ Save KB Entry</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
