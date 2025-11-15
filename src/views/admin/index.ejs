@@ -35,7 +35,7 @@
             </div>
             <div class="stat bg-base-100 rounded-lg shadow-lg">
                 <div class="stat-title">Bot Status</div>
-                <div class="stat-value text-success">Online</div>
+                                <div id="bot-status" class="stat-value text-success">Online</div>
             </div>
         </div>
 
@@ -108,6 +108,28 @@
                 alert('Error: ' + e.message);
             }
         }
+
+    // Check bot status
+    async function checkBotStatus() {
+        try {
+            const res = await fetch('/admin/bot-status');
+            const data = await res.json();
+            const statusEl = document.getElementById('bot-status');
+            if (data.isOnline) {
+                statusEl.textContent = 'Online';
+                statusEl.className = 'stat-value text-success';
+            } else {
+                statusEl.textContent = 'Offline';
+                statusEl.className = 'stat-value text-error';
+            }
+        } catch (e) {
+            console.error('Bot status check failed:', e);
+        }
+    }
+    
+    // Poll bot status every 5 seconds
+    checkBotStatus();
+    setInterval(checkBotStatus, 5000);
     </script>
 </body>
 </html>
