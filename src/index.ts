@@ -165,6 +165,14 @@ app.get("/", (_, res) => {
   res.send("OK - PropScholar AI Online");
 });
 
+// Bot Status endpoint
+app.get("/admin/bot-status", (_, res) => {
+  res.json({ 
+    isOnline: client.isReady(), 
+    botTag: client.user?.tag || "Not logged in"
+  });
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🌍 Server running on port ${PORT}`));
 
