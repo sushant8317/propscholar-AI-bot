@@ -42,7 +42,7 @@
         <!-- Search & Add -->
         <div class="flex flex-col md:flex-row gap-4 mb-6">
             <input type="text" id="search" placeholder="🔍 Search knowledge base..." class="input input-bordered w-full" onkeyup="searchKB()">
-            <a href="/admin-panel/new" class="btn btn-success">➕ Add New KB</a>
+            <a href="/admin/new" class="btn btn-success">➕ Add New KB</a>
         </div>
 
         <!-- KB Table -->
@@ -67,8 +67,8 @@
                             <td class="max-w-xs truncate"><%= d.content.substring(0, 80) %>...</td>
                             <td>
                                 <div class="flex gap-2">
-                                    <a href="/admin-panel/edit/<%= d._id %>" class="btn btn-info btn-xs">Edit</a>
-                                    <a href="/admin-panel/delete/<%= d._id %>" class="btn btn-error btn-xs" onclick="return confirm('Delete this KB?')">Delete</a>
+                                    <a href="/admin/edit/<%= d._id %>" class="btn btn-info btn-xs">Edit</a>
+                                    <a href="/admin/delete/<%= d._id %>" class="btn btn-error btn-xs" onclick="return confirm('Delete this KB?')">Delete</a>
                                 </div>
                             </td>
                         </tr>
