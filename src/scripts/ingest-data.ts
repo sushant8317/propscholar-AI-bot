@@ -1,69 +1,43 @@
-// src/scripts/ingest-data.ts
-
 import mongoose from "mongoose";
-import { getPropScholarData } from "../data/propscholar-data";
+import dotenv from "dotenv";
+import { KNOWLEDGE_BASE } from "../data/kb";
 import { EmbedBatch } from "../services/embedding.service";
 import { VectorService } from "../services/vector.service";
-import dotenv from "dotenv";
 
 dotenv.config();
 
 async function ingestData() {
   try {
+    console.log("📡 Connecting to MongoDB...");
     await mongoose.connect(process.env.MONGODB_URI!);
-    console.log("Connected to MongoDB");
 
     const vector = new VectorService();
-    const dataset = getPropScholarData();
-    const items: any[] = [];
+    console.log("🔥 Starting ingestion...");
 
-    for (const [category, arr] of Object.entries(dataset)) {
-      if (!Array.isArray(arr)) continue;
+    const contents = KNOWLEDGE_BASE.map(k => k.content);
 
-      arr.forEach((item: any) => {
-        const content = `Q: ${item.question}\nA: ${item.answer}`;
+    const embeddings = await EmbedBatch(contents);
 
-        items.push({
-          content,
-          metadata: {
-            category,
-            question: item.question,
-            keywords: item.keywords || []
-          }
-        });
-      });
+    for (let i = 0; i < KNOWLEDGE_BASE.length; i++) {
+      const item = KNOWLEDGE_BASE[i];
+      const emb = embeddings[i];
+
+      await vector.upsertEmbedding(
+        item.id,
+        item.content,
+        emb,
+        { source: "kb" }
+      );
+
+      console.log("✅ Saved:", item.id);
     }
 
-    console.log(`Found ${items.length} items`);
-
-    const BATCH = 20;
-
-    for (let i = 0; i < items.length; i += BATCH) {
-      const batch = items.slice(i, i + BATCH);
-      const texts = batch.map(b => b.content);
-
-      const embeddings = await EmbedBatch(texts);
-
-for (let j = 0; j < batch.length; j++) {
-await vector.upsertEmbedding(
-  `ingest:${i}-${j}`,      // unique ID for each entry
-  batch[j].content,        // text content
-  embeddings[j],           // vector
-  batch[j].metadata        // metadata
-);
-
-}
-
-
-      console.log(`Processed ${i + batch.length} / ${items.length}`);
-      await new Promise(res => setTimeout(res, 1000));
-    }
-
-    console.log("✅ Ingestion Complete");
+    console.log("🎉 Ingestion complete.");
   } catch (err) {
-    console.error(err);
+    console.error("❌ Ingestion error:", err);
   } finally {
     await mongoose.disconnect();
+    console.log("🔌 Disconnected from MongoDB");
   }
 }
 
