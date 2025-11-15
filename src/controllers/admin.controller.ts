@@ -62,4 +62,35 @@ router.put("/kb/:id", async (req: Request, res: Response) => {
   }
 });
 
+      // ===========================
+// REFRESH embeddings
+// ===========================
+router.post("/refresh-embeddings", async (req: Request, res: Response) => {
+  try {
+    // Get all KB entries
+    const docs = await KbEntry.find();
+    
+    // Re-generate embeddings for all entries
+    // Note: This assumes embeddings are auto-generated on save
+    // If you have a specific embedding generation function, call it here
+    let updatedCount = 0;
+    for (const doc of docs) {
+      await doc.save(); // This will trigger the pre-save hook to regenerate embeddings
+      updatedCount++;
+    }
+    
+    res.json({ 
+      ok: true, 
+      message: `Successfully refreshed embeddings for ${updatedCount} entries`,
+      count: updatedCount 
+    });
+  } catch (err) {
+    res.status(500).json({ 
+      ok: false, 
+      error: err,
+      message: "Failed to refresh embeddings" 
+    });
+  }
+});
+
 export default router;
