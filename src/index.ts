@@ -44,35 +44,33 @@ const client = new Client({
   partials: [Partials.Channel]
 });
 
-// ---------------- STRICT PROPSCHOLAR MODE ----------------
+// ---------------- STRICT PROPSCHOLAR FILTER ----------------
 function isPropScholarRelated(text: string) {
   const keywords = [
     "propscholar",
     "evaluation",
     "phase",
-    "instant account",
     "daily loss",
     "max loss",
-    "scholar phase",
-    "examinee phase",
-    "consistency rule",
     "drawdown",
-    "eligibility",
-    "prop firm",
-    "challenge rules",
-    "news rule",
-    "profit target",
-    "scholar",
-    "plus model",
     "funded",
-    "scalping rule",
+    "challenge",
+    "prop firm",
+    "instant account",
+    "payout",
+    "rule",
+    "news",
+    "profit target",
+    "model",
+    "1 step",
+    "2 step"
   ];
 
   text = text.toLowerCase();
   return keywords.some(k => text.includes(k));
 }
 
-// ------------------- Universal LLM Wrapper -------------------
+// ------------------- Enhanced LLM Wrapper -------------------
 async function askGroq(prompt: string): Promise<string> {
   try {
     const response = await axios.post(
@@ -82,10 +80,29 @@ async function askGroq(prompt: string): Promise<string> {
         messages: [
           {
             role: "system",
-            content: `You are a PropScholar support assistant.
-Speak naturally like a human moderator. Keep the tone calm, friendly, and clear.
-Use short sentences. Do not sound robotic.
-Explain simply and ask clarifying questions if needed.`
+            content: `
+You are PropScholar Support.
+PropScholar is a *prop firm*, not a school or tutoring service.
+You ONLY answer in context of:
+- evaluations
+- phases
+- payouts
+- rules
+- drawdowns
+- news rule
+- account activation
+- scaling
+- models (1-step, 2-step, instant)
+
+If the question is not related to PropScholar, reply:
+"I can only help with PropScholar-related questions."
+
+Tone:
+Speak like a human moderator.
+Calm, short sentences, friendly but clear.
+Never guess. If you do not have the info, say:
+"I don’t have enough information about that in the knowledge base."
+            `
           },
           {
             role: "user",
@@ -93,7 +110,7 @@ Explain simply and ask clarifying questions if needed.`
           }
         ],
         max_tokens: 350,
-        temperature: 0.6
+        temperature: 0.45
       },
       {
         headers: {
@@ -105,7 +122,7 @@ Explain simply and ask clarifying questions if needed.`
 
     return response.data.choices[0].message.content.trim();
   } catch {
-    return "Something went wrong.";
+    return "Something went wrong with the response.";
   }
 }
 
@@ -141,18 +158,25 @@ client.on("messageCreate", async (message: Message) => {
     // -------- RAG Retrieval --------
     const ragResult = await rag.generateResponse(message.content);
 
-    // Combine behaviour + RAG context + User Query
+    // -------- Combined Prompt to LLM --------
     const llmPrompt = `
 Behaviour:
 ${ragResult.behaviour}
 
-Context (Knowledge Base):
-${ragResult.answer || "No matching data found."}
+Context From Knowledge Base:
+${ragResult.answer || "No relevant context found in knowledge base."}
 
 User Question:
 ${message.content}
 
-Generate a helpful, short, human-style reply using the behaviour tone.
+Instructions:
+- Respond in a friendly human moderator tone.
+- Keep sentences short and clear.
+- Use the context strictly.
+- If the context is missing info, say:
+  "I don’t have enough information about that in the knowledge base."
+- Never guess.
+- Never say PropScholar is a school or tutoring platform.
 `;
 
     // -------- Ask LLM --------
