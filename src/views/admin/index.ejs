@@ -1,40 +1,113 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" data-theme="dark">
 <head>
-    <title>PropScholar Admin Panel</title>
-    <style>
-        body { font-family: Arial; padding: 20px; background: #111; color: #fff; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { padding: 10px; border-bottom: 1px solid #333; }
-        a.button { padding: 8px 14px; background: #4CAF50; color: white; text-decoration: none; border-radius: 5px; }
-        .delete { background: #d9534f; }
-        .edit { background: #0275d8; }
-    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PropScholar AI Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.24/dist/full.min.css" rel="stylesheet">
 </head>
-<body>
+<body class="bg-base-200">
+    <!-- Navbar -->
+    <div class="navbar bg-base-100 shadow-xl">
+        <div class="flex-1">
+            <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 text-transparent bg-clip-text">🚀 PropScholar AI Dashboard</h1>
+        </div>
+        <div class="flex-none gap-2">
+            <button onclick="refreshEmbeddings()" class="btn btn-primary btn-sm">🔄 Refresh Embeddings</button>
+        </div>
+    </div>
 
-<h2>PropScholar KB Dashboard</h2>
+    <div class="container mx-auto p-6">
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="stat bg-base-100 rounded-lg shadow-lg">
+                <div class="stat-title">Total KBs</div>
+                <div class="stat-value text-primary"><%= docs.length %></div>
+            </div>
+            <div class="stat bg-base-100 rounded-lg shadow-lg">
+                <div class="stat-title">Categories</div>
+                <div class="stat-value text-secondary"><%= [...new Set(docs.map(d => d.category))].length %></div>
+            </div>
+            <div class="stat bg-base-100 rounded-lg shadow-lg">
+                <div class="stat-title">Embeddings</div>
+                <div class="stat-value text-accent">Active</div>
+            </div>
+            <div class="stat bg-base-100 rounded-lg shadow-lg">
+                <div class="stat-title">Bot Status</div>
+                <div class="stat-value text-success">Online</div>
+            </div>
+        </div>
 
-<a class="button" href="/admin-panel/new">➕ Add New KB</a>
+        <!-- Search & Add -->
+        <div class="flex flex-col md:flex-row gap-4 mb-6">
+            <input type="text" id="search" placeholder="🔍 Search knowledge base..." class="input input-bordered w-full" onkeyup="searchKB()">
+            <a href="/admin-panel/new" class="btn btn-success">➕ Add New KB</a>
+        </div>
 
-<table>
-    <tr>
-        <th>Title</th>
-        <th>Category</th>
-        <th>Actions</th>
-    </tr>
+        <!-- KB Table -->
+        <div class="bg-base-100 rounded-lg shadow-xl overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="table table-zebra w-full">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Title</th>
+                            <th>Category</th>
+                            <th>Content Preview</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="kbTable">
+                        <% docs.forEach((d, i) => { %>
+                        <tr class="hover kb-row">
+                            <td><%= i + 1 %></td>
+                            <td class="font-semibold"><%= d.title %></td>
+                            <td><span class="badge badge-primary"><%= d.category %></span></td>
+                            <td class="max-w-xs truncate"><%= d.content.substring(0, 80) %>...</td>
+                            <td>
+                                <div class="flex gap-2">
+                                    <a href="/admin-panel/edit/<%= d._id %>" class="btn btn-info btn-xs">Edit</a>
+                                    <a href="/admin-panel/delete/<%= d._id %>" class="btn btn-error btn-xs" onclick="return confirm('Delete this KB?')">Delete</a>
+                                </div>
+                            </td>
+                        </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
-    <% docs.forEach(d => { %>
-    <tr>
-        <td><%= d.title %></td>
-        <td><%= d.category %></td>
-        <td>
-            <a class="button edit" href="/admin-panel/edit/<%= d._id %>">Edit</a>
-            <a class="button delete" href="/admin-panel/delete/<%= d._id %>">Delete</a>
-        </td>
-    </tr>
-    <% }) %>
-</table>
+        <!-- Pagination -->
+        <div class="join mt-6 flex justify-center">
+            <button class="join-item btn">«</button>
+            <button class="join-item btn btn-active">1</button>
+            <button class="join-item btn">2</button>
+            <button class="join-item btn">3</button>
+            <button class="join-item btn">»</button>
+        </div>
+    </div>
 
+    <script>
+        function searchKB() {
+            const input = document.getElementById('search').value.toLowerCase();
+            const rows = document.querySelectorAll('.kb-row');
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(input) ? '' : 'none';
+            });
+        }
+
+        async function refreshEmbeddings() {
+            if (!confirm('Refresh all embeddings? This may take a while.')) return;
+            try {
+                const res = await fetch('/admin/refresh-embeddings', { method: 'POST' });
+                const data = await res.json();
+                alert(data.message || 'Embeddings refreshed!');
+            } catch(e) {
+                alert('Error: ' + e.message);
+            }
+        }
+    </script>
 </body>
 </html>
