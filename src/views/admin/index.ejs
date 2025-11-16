@@ -7,46 +7,56 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.24/dist/full.min.css" rel="stylesheet">
 </head>
+
 <body class="bg-base-200">
     <!-- Navbar -->
     <div class="navbar bg-base-100 shadow-xl">
         <div class="flex-1">
-            <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 text-transparent bg-clip-text">🚀 PropScholar AI Dashboard</h1>
+            <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 text-transparent bg-clip-text">
+                PropScholar AI Dashboard
+            </h1>
         </div>
-        <div class="flex-none gap-2">
+        <div>
             <button onclick="refreshEmbeddings()" class="btn btn-primary btn-sm">🔄 Refresh Embeddings</button>
         </div>
     </div>
 
     <div class="container mx-auto p-6">
-        <!-- Stats Cards -->
+
+        <!-- Stats -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div class="stat bg-base-100 rounded-lg shadow-lg">
+            <div class="stat bg-base-100 shadow-lg rounded-xl">
                 <div class="stat-title">Total KBs</div>
                 <div class="stat-value text-primary"><%= docs.length %></div>
             </div>
-            <div class="stat bg-base-100 rounded-lg shadow-lg">
+
+            <div class="stat bg-base-100 shadow-lg rounded-xl">
                 <div class="stat-title">Categories</div>
-                <div class="stat-value text-secondary"><%= [...new Set(docs.map(d => d.category))].length %></div>
+                <div class="stat-value text-secondary">
+                    <%= [...new Set(docs.map(d => d.category))].length %>
+                </div>
             </div>
-            <div class="stat bg-base-100 rounded-lg shadow-lg">
+
+            <div class="stat bg-base-100 shadow-lg rounded-xl">
                 <div class="stat-title">Embeddings</div>
                 <div class="stat-value text-accent">Active</div>
             </div>
-            <div class="stat bg-base-100 rounded-lg shadow-lg">
+
+            <div class="stat bg-base-100 shadow-lg rounded-xl">
                 <div class="stat-title">Bot Status</div>
-                                <div id="bot-status" class="stat-value text-success">Online</div>
+                <div id="bot-status" class="stat-value text-success">Online</div>
             </div>
         </div>
 
-        <!-- Search & Add -->
+        <!-- Search + Add -->
         <div class="flex flex-col md:flex-row gap-4 mb-6">
-            <input type="text" id="search" placeholder="🔍 Search knowledge base..." class="input input-bordered w-full" onkeyup="searchKB()">
-            <a href="/admin/new" class="btn btn-success">➕ Add New KB</a>
+            <input id="search" type="text" placeholder="Search knowledge base..."
+                   class="input input-bordered w-full" onkeyup="searchKB()">
+            <a href="/admin-ui/new" class="btn btn-success">➕ Add New KB</a>
         </div>
 
-        <!-- KB Table -->
-        <div class="bg-base-100 rounded-lg shadow-xl overflow-hidden">
+        <!-- Table -->
+        <div class="bg-base-100 rounded-xl shadow-xl overflow-hidden">
             <div class="overflow-x-auto">
                 <table class="table table-zebra w-full">
                     <thead>
@@ -54,82 +64,52 @@
                             <th>#</th>
                             <th>Title</th>
                             <th>Category</th>
-                            <th>Content Preview</th>
+                            <th>Preview</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
+
                     <tbody id="kbTable">
-                        <% docs.forEach((d, i) => { %>
-                        <tr class="hover kb-row">
+                    <% docs.forEach((d, i) => { %>
+                        <tr class="kb-row hover">
                             <td><%= i + 1 %></td>
-                            <td class="font-semibold"><%= d.title %></td>
+                            <td><%= d.title %></td>
                             <td><span class="badge badge-primary"><%= d.category %></span></td>
-                            <td class="max-w-xs truncate"><%= d.content.substring(0, 80) %>...</td>
+                            <td class="truncate max-w-xs"><%= d.content.substring(0, 80) %>...</td>
                             <td>
                                 <div class="flex gap-2">
-                                    <a href="/admin/edit/<%= d._id %>" class="btn btn-info btn-xs">Edit</a>
-                                    <a href="/admin/delete/<%= d._id %>" class="btn btn-error btn-xs" onclick="return confirm('Delete this KB?')">Delete</a>
+                                    <a href="/admin-ui/edit/<%= d._id %>"
+                                       class="btn btn-info btn-xs">Edit</a>
+
+                                    <a href="/admin-ui/delete/<%= d._id %>"
+                                       onclick="return confirm('Delete this KB?')"
+                                       class="btn btn-error btn-xs">Delete</a>
                                 </div>
                             </td>
                         </tr>
-                        <% }) %>
+                    <% }) %>
                     </tbody>
                 </table>
             </div>
         </div>
 
-        <!-- Pagination -->
-        <div class="join mt-6 flex justify-center">
-            <button class="join-item btn">«</button>
-            <button class="join-item btn btn-active">1</button>
-            <button class="join-item btn">2</button>
-            <button class="join-item btn">3</button>
-            <button class="join-item btn">»</button>
-        </div>
     </div>
 
-    <script>
-        function searchKB() {
-            const input = document.getElementById('search').value.toLowerCase();
-            const rows = document.querySelectorAll('.kb-row');
-            rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                row.style.display = text.includes(input) ? '' : 'none';
-            });
-        }
-
-        async function refreshEmbeddings() {
-            if (!confirm('Refresh all embeddings? This may take a while.')) return;
-            try {
-                const res = await fetch('/admin/refresh-embeddings', { method: 'POST' });
-                const data = await res.json();
-                alert(data.message || 'Embeddings refreshed!');
-            } catch(e) {
-                alert('Error: ' + e.message);
-            }
-        }
-
-    // Check bot status
-    async function checkBotStatus() {
-        try {
-            const res = await fetch('/admin/bot-status');
-            const data = await res.json();
-            const statusEl = document.getElementById('bot-status');
-            if (data.isOnline) {
-                statusEl.textContent = 'Online';
-                statusEl.className = 'stat-value text-success';
-            } else {
-                statusEl.textContent = 'Offline';
-                statusEl.className = 'stat-value text-error';
-            }
-        } catch (e) {
-            console.error('Bot status check failed:', e);
-        }
+<script>
+    function searchKB() {
+        const q = document.getElementById("search").value.toLowerCase();
+        document.querySelectorAll(".kb-row").forEach(row => {
+            row.style.display = row.textContent.toLowerCase().includes(q) ? "" : "none";
+        });
     }
-    
-    // Poll bot status every 5 seconds
-    checkBotStatus();
-    setInterval(checkBotStatus, 5000);
-    </script>
+
+    async function refreshEmbeddings() {
+        if (!confirm("Refresh all embeddings?")) return;
+        const res = await fetch("/admin/refresh-embeddings", { method: "POST" });
+        const data = await res.json();
+        alert(data.message);
+    }
+</script>
+
 </body>
 </html>
