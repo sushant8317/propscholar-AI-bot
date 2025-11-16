@@ -1,224 +1,93 @@
 // src/index.ts
-
-import dotenv from "dotenv";
-dotenv.config();
-
-// ---------------------------------------------------
-// Prevent multiple bot starts (Render + module imports)
-// ---------------------------------------------------
-if (require.main !== module) {
-  console.log("⚠ Bot start skipped (imported by another module)");
-  process.exit(0);
-}
-
-import {
-  Client,
-  GatewayIntentBits,
-  Message,
-  Partials
-} from "discord.js";
-
-import axios from "axios";
-import mongoose from "mongoose";
 import express from "express";
-import path from "path";
+import dotenv from "dotenv";
+import mongoose from "mongoose";
+import { Client, GatewayIntentBits } from "discord.js";
+import bodyParser from "body-parser";
 import basicAuth from "express-basic-auth";
 
-import adminRouter from "./controllers/admin.controller";
-import adminUIRouter from "./controllers/admin-ui.controller";
+import { router as adminRouter } from "./controllers/admin.controller";
+import { router as adminUIRouter } from "./controllers/admin-ui.controller";
 
 import { RAGService } from "./services/rag.service";
+import { Knowledge } from "./models/knowledge.model";
 
-const rag = new RAGService();
+dotenv.config();
 
-// ---------------------------------------------------
-// MongoDB
-// ---------------------------------------------------
-async function connectDB() {
-  try {
-    await mongoose.connect(process.env.MONGODB_URI as string);
-    console.log("✅ MongoDB connected");
-  } catch (err) {
-    console.error("❌ MongoDB error:", err);
-    process.exit(1);
-  }
-}
+const app = express();
+app.use(bodyParser.json());
+app.use(express.urlencoded({ extended: true }));
 
-// ---------------------------------------------------
-// Discord Client
-// ---------------------------------------------------
+// ---------- SECURITY ----------
+app.use(
+  basicAuth({
+    users: { admin: process.env.ADMIN_API_KEY || "propscholar2069" },
+    challenge: true,
+  })
+);
+
+// ---------- ROUTES ----------
+app.use("/admin", adminRouter);
+app.use("/admin-ui", adminUIRouter);
+
+// ---------- MONGODB ----------
+mongoose
+  .connect(process.env.MONGODB_URI!)
+  .then(() => console.log("✅ MongoDB connected"))
+  .catch((err) => console.error("❌ MongoDB error:", err));
+
+// ---------- DISCORD BOT ----------
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
+    GatewayIntentBits.MessageContent,
   ],
-  partials: [Partials.Channel]
 });
 
-// ---------------------------------------------------
-// Keyword Filter
-// ---------------------------------------------------
-function isPropScholarRelated(text: string) {
-  const keywords = [
-    "propscholar",
-    "evaluation",
-    "phase",
-    "instant account",
-    "daily loss",
-    "max loss",
-    "scholar phase",
-    "examinee phase",
-    "consistency rule",
-    "drawdown",
-    "eligibility",
-    "prop firm",
-    "challenge rules",
-    "news rule",
-    "profit target",
-    "scholar",
-    "plus model",
-    "funded",
-    "scalping rule",
-  ];
+const rag = new RAGService();
 
-  text = text.toLowerCase();
-  return keywords.some(k => text.includes(k));
-}
-
-// ---------------------------------------------------
-// LLM Wrapper - Groq
-// ---------------------------------------------------
-async function askGroq(prompt: string): Promise<string> {
-  try {
-    const response = await axios.post(
-      "https://api.groq.com/openai/v1/chat/completions",
-      {
-        model: "llama-3.1-8b-instant",
-        messages: [
-          {
-            role: "system",
-            content: `You are a PropScholar support assistant.
-Speak clearly, like a helpful human moderator.
-Use short sentences.`
-          },
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        max_tokens: 350,
-        temperature: 0.6
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-          "Content-Type": "application/json"
-        }
-      }
-    );
-
-    return response.data.choices[0].message.content.trim();
-  } catch {
-    return "Something went wrong.";
-  }
-}
-
-// ---------------------------------------------------
-// Bot Ready
-// ---------------------------------------------------
-client.on("clientReady", () => {
-  console.log(`🤖 Bot logged in as ${client.user?.tag}`);
-});
-
-// ---------------------------------------------------
-// Message Handler
-// ---------------------------------------------------
-client.on("messageCreate", async (message: Message) => {
-  if (message.author.bot) return;
-
-  const text = message.content.toLowerCase().trim();
-  const isQuestion =
-    text.includes("?") ||
-    ["how", "what", "why", "can", "is", "does", "when", "where"]
-      .some(w => text.startsWith(w));
-
-  if (!isQuestion) return;
-
-  if (!isPropScholarRelated(text)) {
-    return message.reply(
-      "**I can only assist with PropScholar-related questions.**"
-    );
-  }
+// ---------- MESSAGE HANDLER ----------
+client.on("messageCreate", async (msg) => {
+  if (msg.author.bot) return;
 
   try {
-    if ("sendTyping" in message.channel) {
-      await (message.channel as any).sendTyping();
-    }
+    const userQuery = msg.content.trim();
+    const result = await rag.generateResponse(userQuery);
 
-    // Step 1: RAG retrieval
-    const ragResult = await rag.generateResponse(message.content);
+    const reply =
+      result.answer && result.answer.length > 0
+        ? result.answer
+        : "I can answer PropScholar-related questions. Ask about rules, models, payouts, or trading conditions.";
 
-    const finalPrompt = `
-Behaviour:
-You are a calm, clear PropScholar support assistant.
-
-Context:
-${ragResult.answer || "No matching data found."}
-
-User Question:
-${message.content}
-
-Reply with a simple, short, clean answer in human tone.
-    `;
-
-    // Step 2: LLM output
-    const llmReply = await askGroq(finalPrompt);
-
-    return message.reply(`**Answer:**\n${llmReply}`);
-
+    msg.reply(reply);
   } catch (err) {
-    console.error(err);
-    return message.reply("Something went wrong.");
+    console.error("BOT ERROR:", err);
+    msg.reply("Something went wrong. Try again.");
   }
 });
 
-// ---------------------------------------------------
-// Start Bot
-// ---------------------------------------------------
-connectDB().then(() => client.login(process.env.DISCORD_TOKEN));
-
-// ---------------------------------------------------
-// Web Server for Render
-// ---------------------------------------------------
-const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-app.set("view engine", "ejs");
-app.set("views", path.join(__dirname, "views"));
-
-const authMiddleware = basicAuth({
-  users: { admin: process.env.ADMIN_PASSWORD || "propscholar2069" },
-  challenge: true
+// ---------- START DISCORD ----------
+client.once("ready", () => {
+  console.log("🤖 Bot logged in & ready");
 });
 
-app.use("/admin", authMiddleware, adminUIRouter);
-app.use("/admin", adminRouter);
+client.login(process.env.DISCORD_TOKEN);
 
-app.get("/", (_, res) => {
-  res.send("OK - PropScholar AI Online");
+// ---------- EXPRESS ROOT ----------
+app.get("/", (req, res) => {
+  res.send("PropScholar AI Bot Running");
 });
 
+// ---------- START WEB SERVER ----------
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🌍 Server running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`🌍 Server running on port ${PORT}`);
+});
 
-// ---------------------------------------------------
-// Auto Ingest DISABLED
-// ---------------------------------------------------
-// import DynamicIngestService from "./services/dynamic-ingest.service";
-// const svc = new DynamicIngestService();
-// if (process.env.INGEST_ON_STARTUP === "true") svc.trigger();
-// if (process.env.AUTOMATIC_INGEST_MINUTES)
-//   setInterval(() => svc.trigger(),
-//     Number(process.env.AUTOMATIC_INGEST_MINUTES) * 60 * 1000);
+// ---------- OPTIONAL INGEST ON STARTUP ----------
+if (process.env.INGEST_ON_STARTUP === "true") {
+  import("./scripts/ingest-data").then(() => {
+    console.log("📥 Automatic ingestion complete.");
+  });
+}
