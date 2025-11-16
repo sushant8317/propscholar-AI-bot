@@ -1,20 +1,23 @@
 // src/services/embedding.service.ts
 import axios from "axios";
 
+const OPENAI_URL = "https://api.openai.com/v1/embeddings";
+const MODEL = process.env.EMBEDDING_MODEL || "text-embedding-3-small";  
+
 /**
  * Create embedding for one text
  */
 export async function EmbedText(text: string): Promise<number[]> {
   try {
     const response = await axios.post(
-      "https://api.groq.com/openai/v1/embeddings",
+      OPENAI_URL,
       {
-        model: process.env.EMBEDDING_MODEL || "text-embedding-3-small",
+        model: MODEL,
         input: text
       },
       {
         headers: {
-          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
           "Content-Type": "application/json"
         }
       }
@@ -33,14 +36,14 @@ export async function EmbedText(text: string): Promise<number[]> {
 export async function EmbedBatch(texts: string[]): Promise<number[][]> {
   try {
     const response = await axios.post(
-      "https://api.groq.com/openai/v1/embeddings",
+      OPENAI_URL,
       {
-        model: process.env.EMBEDDING_MODEL || "text-embedding-3-small",
+        model: MODEL,
         input: texts
       },
       {
         headers: {
-          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
           "Content-Type": "application/json"
         }
       }

@@ -1,44 +1,36 @@
 // src/controllers/admin-ui.controller.ts
 
-import express from "express";
+import { Router } from "express";
 import { KbEntry } from "../models/kbEntry.model";
 
-const router = express.Router();
+const router = Router();
 
-// Dashboard list
+// Dashboard
 router.get("/", async (req, res) => {
-  const docs = await KbEntry.find().lean();
-  res.render("admin/index", { docs });
+  const items = await KbEntry.find().lean();
+  res.render("admin/index", { items });
 });
 
-// New KB form
+// New
 router.get("/new", (req, res) => {
   res.render("admin/new");
 });
 
-// Create KB entry
 router.post("/new", async (req, res) => {
   const { title, content, category, url } = req.body;
-
-  await KbEntry.create({
-    title,
-    content,
-    category,
-    url
-  });
-
+  await KbEntry.create({ title, content, category, url });
   res.redirect("/admin-panel");
 });
 
-// Edit page
+// Edit
 router.get("/edit/:id", async (req, res) => {
   const item = await KbEntry.findById(req.params.id).lean();
   res.render("admin/edit", { item });
 });
 
-// Update
 router.post("/edit/:id", async (req, res) => {
-  await KbEntry.findByIdAndUpdate(req.params.id, req.body);
+  const { title, content, category, url } = req.body;
+  await KbEntry.findByIdAndUpdate(req.params.id, { title, content, category, url });
   res.redirect("/admin-panel");
 });
 
