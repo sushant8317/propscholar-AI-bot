@@ -55,7 +55,7 @@ const toxic = new ToxicDetectorService();
 const inspector = new PolicyInspectorService();
 const scholaris = new ScholarisService();
 
-// ---------------- LLM CALL (GROQ) ----------------
+// ---------------- GROQ LLM CALL ----------------
 async function askGroq(prompt: string): Promise<string> {
   try {
     const res = await axios.post(
@@ -67,8 +67,8 @@ async function askGroq(prompt: string): Promise<string> {
             role: "system",
             content: `
 You are Scholaris AI — PropScholar's support assistant.
-Short sentences. No emojis. Clear instructions.
-ALWAYS remain inside PropScholar rules, models, payouts, and policies.
+Short sentences. No emojis. Clear & human tone.
+Always stay inside PropScholar rules, models, payouts, and policies.
 Never give general forex advice.
             `,
           },
@@ -103,19 +103,19 @@ client.on("messageCreate", async (msg) => {
     // 1️⃣ TOXICITY CHECK
     const toxicityIssues = await toxic.check(userQuery);
 
-    // 2️⃣ RAG (KB + Memory)
+    // 2️⃣ RAG: Knowledge + Memory
     const ragResult = await rag.generateResponse(userId, userQuery);
 
     // 3️⃣ POLICY INSPECTION
     const policyIssues = inspector.inspect(userQuery);
 
-    // 4️⃣ GUARDRAILS (Rewrite unsafe queries)
+    // 4️⃣ GUARDRAIL REWRITE
     const rewritten = await scholaris.regenerateWithConstraints(
       userQuery,
       [...toxicityIssues, ...policyIssues]
     );
 
-    // 5️⃣ FINAL LLM PROMPT
+    // 5️⃣ FINAL PROMPT
     const finalPrompt = `
 User Query:
 ${userQuery}
@@ -123,7 +123,7 @@ ${userQuery}
 Rewritten Safe Version:
 ${rewritten.answer}
 
-Short-Term + Long-Term Memory:
+User Memory:
 ${ragResult.memory}
 
 Policy Violations:
@@ -135,14 +135,13 @@ ${toxicityIssues.join(", ") || "none"}
 Relevant PropScholar Knowledge:
 ${ragResult.answer}
 
-Tone & Behaviour Rules:
+Tone Behaviour:
 ${ragResult.behaviour}
 
-Now generate FINAL SAFE & ACCURATE PropScholar answer.
-`;
+Generate FINAL SAFE & ACCURATE PropScholar answer.
+    `;
 
     const finalReply = await askGroq(finalPrompt);
-
     msg.reply(finalReply);
   } catch (err) {
     console.error("BOT ERROR:", err);
