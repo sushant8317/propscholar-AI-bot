@@ -1,3 +1,4 @@
+
 import { Router } from "express";
 import { KnowledgeModel } from "../models/knowledge.model";
 
@@ -36,14 +37,4 @@ router.post("/edit/:id", async (req, res) => {
 router.get("/delete/:id", async (req, res) => {
   await KnowledgeModel.findByIdAndDelete(req.params.id);
   res.redirect("/admin-ui");
-});
-
-router.get("/", async (req, res) => {
-  const docs = await KnowledgeModel.find();
-  const categories = new Set(docs.map(d => d.category)).size;
-
-  res.render("admin/index", {
-    docs,
-    categories
-  });
 });
