@@ -1,67 +1,39 @@
-// src/controllers/admin-ui.controller.ts
-
 import { Router } from "express";
-import { KnowledgeModel } from "../models/knowledge.model";   // FIXED ✔
+import { KnowledgeModel } from "../models/knowledge.model";
 
 export const router = Router();
 
 // Dashboard
 router.get("/", async (req, res) => {
-  try {
-    const docs = await KnowledgeModel.find().sort({ createdAt: -1 });
-    res.render("admin/index", { docs });
-  } catch (err) {
-    console.error("Dashboard Error:", err);
-    res.status(500).send("Error loading dashboard");
-  }
+  const docs = await KnowledgeModel.find().lean();
+  res.render("admin/index", { docs });
 });
 
-// NEW KB FORM
+// New KB form
 router.get("/new", (req, res) => {
   res.render("admin/new");
 });
 
-// CREATE KB
+// Create KB
 router.post("/new", async (req, res) => {
-  try {
-    await KnowledgeModel.create(req.body);
-    res.redirect("/admin-ui");
-  } catch (err) {
-    console.error("Create KB Error:", err);
-    res.status(500).send("Failed to create KB");
-  }
+  await KnowledgeModel.create(req.body);
+  res.redirect("/admin-ui");
 });
 
-// EDIT FORM
+// Edit KB form
 router.get("/edit/:id", async (req, res) => {
-  try {
-    const doc = await KnowledgeModel.findById(req.params.id);
-    if (!doc) return res.status(404).send("KB not found");
-    res.render("admin/edit", { doc });
-  } catch (err) {
-    console.error("Edit Page Error:", err);
-    res.status(500).send("Failed to load edit page");
-  }
+  const doc = await KnowledgeModel.findById(req.params.id).lean();
+  res.render("admin/edit", { doc });
 });
 
-// UPDATE KB
+// Update KB
 router.post("/edit/:id", async (req, res) => {
-  try {
-    await KnowledgeModel.findByIdAndUpdate(req.params.id, req.body);
-    res.redirect("/admin-ui");
-  } catch (err) {
-    console.error("Update KB Error:", err);
-    res.status(500).send("Failed to update KB");
-  }
+  await KnowledgeModel.findByIdAndUpdate(req.params.id, req.body);
+  res.redirect("/admin-ui");
 });
 
-// DELETE KB
+// Delete
 router.get("/delete/:id", async (req, res) => {
-  try {
-    await KnowledgeModel.findByIdAndDelete(req.params.id);
-    res.redirect("/admin-ui");
-  } catch (err) {
-    console.error("Delete KB Error:", err);
-    res.status(500).send("Failed to delete KB");
-  }
+  await KnowledgeModel.findByIdAndDelete(req.params.id);
+  res.redirect("/admin-ui");
 });
