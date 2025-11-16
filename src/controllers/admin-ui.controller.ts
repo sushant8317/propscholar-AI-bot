@@ -1,40 +1,47 @@
+// src/controllers/admin-ui.controller.ts
+import express from "express";
+import KnowledgeModel from "../models/knowledge.model";
 
-import { Router } from "express";
-import { KnowledgeModel } from "../models/knowledge.model";
+export const router = express.Router();
 
-export const router = Router();
-
-// Dashboard
+// ---------------------------
+// ADMIN UI MAIN PAGE
+// ---------------------------
 router.get("/", async (req, res) => {
-  const docs = await KnowledgeModel.find().lean();
-  res.render("admin/index", { docs });
+  try {
+    const docs = await KnowledgeModel.find().lean();
+
+    // UNIQUE CATEGORIES
+    const categories = [...new Set(docs.map((d) => d.category || "Uncategorized"))];
+
+    res.render("admin/index", {
+      docs,
+      categories,
+      total: docs.length
+    });
+
+  } catch (err) {
+    console.error("🔥 admin-ui error:", err);
+    res.status(500).send("Internal Server Error");
+  }
 });
 
-// New KB form
-router.get("/new", (req, res) => {
-  res.render("admin/new");
-});
+// ---------------------------
+// MASS DELETE API
+// ---------------------------
+router.post("/delete-multiple", async (req, res) => {
+  try {
+    const { ids } = req.body;
 
-// Create KB
-router.post("/new", async (req, res) => {
-  await KnowledgeModel.create(req.body);
-  res.redirect("/admin-ui");
-});
+    if (!ids || !Array.isArray(ids)) {
+      return res.status(400).json({ error: "Invalid IDs" });
+    }
 
-// Edit KB form
-router.get("/edit/:id", async (req, res) => {
-  const doc = await KnowledgeModel.findById(req.params.id).lean();
-  res.render("admin/edit", { doc });
-});
+    await KnowledgeModel.deleteMany({ _id: { $in: ids } });
 
-// Update KB
-router.post("/edit/:id", async (req, res) => {
-  await KnowledgeModel.findByIdAndUpdate(req.params.id, req.body);
-  res.redirect("/admin-ui");
-});
-
-// Delete
-router.get("/delete/:id", async (req, res) => {
-  await KnowledgeModel.findByIdAndDelete(req.params.id);
-  res.redirect("/admin-ui");
+    res.json({ success: true, deleted: ids.length });
+  } catch (err) {
+    console.error("🔥 Delete Multiple Error:", err);
+    res.status(500).json({ error: "Server Failed" });
+  }
 });
