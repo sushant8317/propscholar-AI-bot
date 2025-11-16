@@ -1,19 +1,11 @@
 // src/services/memory.service.ts
-
-import { MemoryModel } from "../models/memory.model";
+import MemoryModel from "../models/memory.model";
 
 export class MemoryService {
-  
-  // -----------------------------
-  // List all users for dashboard
-  // -----------------------------
   async listUsers() {
     return MemoryModel.find().select("userId createdAt updatedAt");
   }
 
-  // -----------------------------
-  // Get or create user memory
-  // -----------------------------
   async getMemory(userId: string) {
     let mem = await MemoryModel.findOne({ userId });
 
@@ -25,12 +17,13 @@ export class MemoryService {
       });
     }
 
+    // 🔥 FIX: Ensure fields always exist
+    if (!Array.isArray(mem.shortTerm)) mem.shortTerm = [];
+    if (!Array.isArray(mem.longTerm)) mem.longTerm = [];
+
     return mem;
   }
 
-  // -----------------------------
-  // Add short-term memory item
-  // -----------------------------
   async addMessage(userId: string, message: string) {
     const mem = await this.getMemory(userId);
 
@@ -39,14 +32,10 @@ export class MemoryService {
       createdAt: new Date(),
     });
 
-    // keep ONLY last 20 messages
-    if (mem.shortTerm.length > 20) {
-      mem.shortTerm.shift();
-    }
+    if (mem.shortTerm.length > 20) mem.shortTerm.shift();
 
     mem.updatedAt = new Date();
     await mem.save();
-
     return mem;
   }
 }
