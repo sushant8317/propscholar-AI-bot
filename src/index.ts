@@ -1,4 +1,3 @@
-// src/index.ts
 import express from "express";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
@@ -6,6 +5,7 @@ import { Client, GatewayIntentBits } from "discord.js";
 import bodyParser from "body-parser";
 import basicAuth from "express-basic-auth";
 import axios from "axios";
+import path from "path";   // ✅ ADD THIS LINE
 
 import { router as adminRouter } from "./controllers/admin.controller";
 import { router as adminUIRouter } from "./controllers/admin-ui.controller";
