@@ -25,9 +25,11 @@ app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ---------------------------------------------------
-// SECURITY
+// SECURITY — protect ONLY /admin API
+// DO NOT protect /admin-ui dashboard
 // ---------------------------------------------------
 app.use(
+  "/admin",
   basicAuth({
     users: { admin: process.env.ADMIN_API_KEY || "propscholar2069" },
     challenge: true,
@@ -37,8 +39,8 @@ app.use(
 // ---------------------------------------------------
 // ROUTES
 // ---------------------------------------------------
-app.use("/admin", adminRouter);
-app.use("/admin-ui", adminUIRouter);
+app.use("/admin", adminRouter);       // Protected by basicAuth
+app.use("/admin-ui", adminUIRouter);  // Public dashboard (safe)
 
 // ---------------------------------------------------
 // DATABASE
@@ -62,10 +64,10 @@ const client = new Client({
 // ---------------------------------------------------
 // SERVICES
 // ---------------------------------------------------
-const rag = new RAGService();                   // RAG + Memory + Synonyms + AI auto-learning (T2)
-const toxic = new ToxicDetectorService();       // Toxicity guard
-const inspector = new PolicyInspectorService(); // Policy guard
-const scholaris = new ScholarisService();       // Guardrail rewriting
+const rag = new RAGService();
+const toxic = new ToxicDetectorService();
+const inspector = new PolicyInspectorService();
+const scholaris = new ScholarisService();
 
 // ---------------------------------------------------
 // GROQ LLM CALL
@@ -82,7 +84,8 @@ async function askGroq(prompt: string): Promise<string> {
             content: `
 You are Scholaris AI — PropScholar's support assistant.
 Short sentences. No emojis. Human tone.
-Only PropScholar details. No forex advice.
+Only PropScholar context.
+Never give forex advice.
             `,
           },
           { role: "user", content: prompt },
@@ -115,22 +118,22 @@ client.on("messageCreate", async (msg) => {
   const userId = msg.author.id;
 
   try {
-    // 1️⃣ Check toxicity
+    // 1️⃣ Toxicity
     const toxicityIssues = await toxic.check(userQuery);
 
-    // 2️⃣ RAG + Memory + AI Auto-Learning (T2)
+    // 2️⃣ RAG — Memory + KB
     const ragResult = await rag.generateResponse(userId, userQuery);
 
-    // 3️⃣ Detect rule violations
+    // 3️⃣ PropScholar Rule Violations
     const policyIssues = inspector.inspect(userQuery);
 
-    // 4️⃣ Rewrite unsafe queries via Guardrails
+    // 4️⃣ Guardrails rewrite
     const rewritten = await scholaris.regenerateWithConstraints(
       userQuery,
       [...toxicityIssues, ...policyIssues]
     );
 
-    // 5️⃣ FINAL prompt for Groq
+    // 5️⃣ Final prompt
     const finalPrompt = `
 User Query:
 ${userQuery}
@@ -150,7 +153,7 @@ ${toxicityIssues.join(", ") || "none"}
 Relevant Knowledge:
 ${ragResult.answer}
 
-Tone Rules:
+Behaviour Rules:
 ${ragResult.behaviour}
 
 Generate FINAL SAFE & ACCURATE PropScholar answer.
@@ -175,14 +178,14 @@ client.once("ready", () => {
 client.login(process.env.DISCORD_TOKEN);
 
 // ---------------------------------------------------
-// EXPRESS ROOT
+// ROOT
 // ---------------------------------------------------
 app.get("/", (req, res) => {
   res.send("PropScholar AI Bot Running");
 });
 
 // ---------------------------------------------------
-// START WEB SERVER
+// START SERVER
 // ---------------------------------------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
@@ -190,7 +193,7 @@ app.listen(PORT, () => {
 });
 
 // ---------------------------------------------------
-// OPTIONAL INGEST
+// Optional KB Ingestion
 // ---------------------------------------------------
 if (process.env.INGEST_ON_STARTUP === "true") {
   import("./scripts/ingest-data").then(() => {
