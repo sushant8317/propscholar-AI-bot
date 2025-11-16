@@ -1,9 +1,54 @@
-<%- include("layout", { title: "PropScholar AI Dashboard" }) %>
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PropScholar Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.24/dist/full.min.css" rel="stylesheet">
+</head>
+<body class="bg-base-200">
 
-<div class="box">
-  <a href="/admin-ui/memory">View Memory</a>
+<div class="navbar bg-base-100 shadow-xl mb-5">
+    <div class="flex-1">
+        <h1 class="text-2xl font-bold">PropScholar KB Dashboard</h1>
+    </div>
+    <div class="flex-none">
+        <a href="/admin-ui/new" class="btn btn-success">New KB</a>
+    </div>
 </div>
 
-<div class="box">
-  <a href="/admin-ui/teach">Add Manual Knowledge</a>
+<div class="container mx-auto">
+    <div class="bg-base-100 rounded-lg p-5 shadow-xl">
+
+        <table class="table table-zebra w-full">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Title</th>
+                    <th>Category</th>
+                    <th>Preview</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% docs.forEach((d, i) => { %>
+                <tr>
+                    <td><%= i + 1 %></td>
+                    <td><%= d.title %></td>
+                    <td><%= d.category %></td>
+                    <td><%= d.content.substring(0, 60) %>...</td>
+                    <td>
+                        <a href="/admin-ui/edit/<%= d._id %>" class="btn btn-info btn-xs">Edit</a>
+                        <a href="/admin-ui/delete/<%= d._id %>" class="btn btn-error btn-xs">Delete</a>
+                    </td>
+                </tr>
+                <% }); %>
+            </tbody>
+        </table>
+
+    </div>
 </div>
+
+</body>
+</html>
