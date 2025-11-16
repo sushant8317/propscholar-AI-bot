@@ -1,18 +1,17 @@
 // src/controllers/admin-ui.controller.ts
 import express from "express";
-import KnowledgeModel from "../models/knowledge.model";
+import { KnowledgeModel } from "../models/knowledge.model";
 
 export const router = express.Router();
 
-// ---------------------------
-// ADMIN UI MAIN PAGE
-// ---------------------------
+// MAIN UI PAGE
 router.get("/", async (req, res) => {
   try {
     const docs = await KnowledgeModel.find().lean();
 
-    // UNIQUE CATEGORIES
-    const categories = [...new Set(docs.map((d) => d.category || "Uncategorized"))];
+    const categories: string[] = [
+      ...new Set(docs.map((d: any) => d.category || "Uncategorized"))
+    ];
 
     res.render("admin/index", {
       docs,
@@ -21,27 +20,26 @@ router.get("/", async (req, res) => {
     });
 
   } catch (err) {
-    console.error("🔥 admin-ui error:", err);
+    console.error("UI Controller Error:", err);
     res.status(500).send("Internal Server Error");
   }
 });
 
-// ---------------------------
-// MASS DELETE API
-// ---------------------------
+// DELETE MULTIPLE
 router.post("/delete-multiple", async (req, res) => {
   try {
     const { ids } = req.body;
 
-    if (!ids || !Array.isArray(ids)) {
-      return res.status(400).json({ error: "Invalid IDs" });
+    if (!Array.isArray(ids)) {
+      return res.status(400).json({ error: "Invalid ids" });
     }
 
     await KnowledgeModel.deleteMany({ _id: { $in: ids } });
 
     res.json({ success: true, deleted: ids.length });
+
   } catch (err) {
-    console.error("🔥 Delete Multiple Error:", err);
-    res.status(500).json({ error: "Server Failed" });
+    console.error("Delete Multiple Error:", err);
+    res.status(500).json({ error: "Server error" });
   }
 });
