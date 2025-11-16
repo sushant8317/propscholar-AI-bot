@@ -1,0 +1,12 @@
+<%- include("layout", { title: "Memory Users" }) %>
+
+<ul>
+  <% users.forEach(u => { %>
+    <li>
+      <a href="/admin-ui/memory/<%= u.userId %>">
+        <%= u.userId %>
+      </a>
+      (updated: <%= u.updatedAt.toLocaleString() %>)
+    </li>
+  <% }) %>
+</ul>

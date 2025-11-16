@@ -17,12 +17,16 @@ import { ScholarisService } from "./services/scholaris.service";
 
 dotenv.config();
 
-// ---------------- EXPRESS ----------------
+// ---------------------------------------------------
+// EXPRESS
+// ---------------------------------------------------
 const app = express();
 app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ---------------- SECURITY ----------------
+// ---------------------------------------------------
+// SECURITY
+// ---------------------------------------------------
 app.use(
   basicAuth({
     users: { admin: process.env.ADMIN_API_KEY || "propscholar2069" },
@@ -30,17 +34,23 @@ app.use(
   })
 );
 
-// ---------------- ROUTES ----------------
+// ---------------------------------------------------
+// ROUTES
+// ---------------------------------------------------
 app.use("/admin", adminRouter);
 app.use("/admin-ui", adminUIRouter);
 
-// ---------------- DATABASE ----------------
+// ---------------------------------------------------
+// DATABASE
+// ---------------------------------------------------
 mongoose
   .connect(process.env.MONGODB_URI!)
   .then(() => console.log("✅ MongoDB connected"))
   .catch((err) => console.error("❌ MongoDB error:", err));
 
-// ---------------- DISCORD BOT ----------------
+// ---------------------------------------------------
+// DISCORD BOT
+// ---------------------------------------------------
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -49,13 +59,17 @@ const client = new Client({
   ],
 });
 
-// ---------------- SERVICES ----------------
-const rag = new RAGService();
-const toxic = new ToxicDetectorService();
-const inspector = new PolicyInspectorService();
-const scholaris = new ScholarisService();
+// ---------------------------------------------------
+// SERVICES
+// ---------------------------------------------------
+const rag = new RAGService();                   // RAG + Memory + Synonyms + AI auto-learning (T2)
+const toxic = new ToxicDetectorService();       // Toxicity guard
+const inspector = new PolicyInspectorService(); // Policy guard
+const scholaris = new ScholarisService();       // Guardrail rewriting
 
-// ---------------- GROQ LLM CALL ----------------
+// ---------------------------------------------------
+// GROQ LLM CALL
+// ---------------------------------------------------
 async function askGroq(prompt: string): Promise<string> {
   try {
     const res = await axios.post(
@@ -67,9 +81,8 @@ async function askGroq(prompt: string): Promise<string> {
             role: "system",
             content: `
 You are Scholaris AI — PropScholar's support assistant.
-Short sentences. No emojis. Clear & human tone.
-Always stay inside PropScholar rules, models, payouts, and policies.
-Never give general forex advice.
+Short sentences. No emojis. Human tone.
+Only PropScholar details. No forex advice.
             `,
           },
           { role: "user", content: prompt },
@@ -88,11 +101,13 @@ Never give general forex advice.
     return res.data.choices[0].message.content.trim();
   } catch (err: any) {
     console.error("LLM ERROR:", err.response?.data || err.message);
-    return "Something went wrong generating a response.";
+    return "Something went wrong while generating a response.";
   }
 }
 
-// ---------------- MESSAGE HANDLER ----------------
+// ---------------------------------------------------
+// DISCORD MESSAGE HANDLER
+// ---------------------------------------------------
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
 
@@ -100,22 +115,22 @@ client.on("messageCreate", async (msg) => {
   const userId = msg.author.id;
 
   try {
-    // 1️⃣ TOXICITY CHECK
+    // 1️⃣ Check toxicity
     const toxicityIssues = await toxic.check(userQuery);
 
-    // 2️⃣ RAG: Knowledge + Memory
+    // 2️⃣ RAG + Memory + AI Auto-Learning (T2)
     const ragResult = await rag.generateResponse(userId, userQuery);
 
-    // 3️⃣ POLICY INSPECTION
+    // 3️⃣ Detect rule violations
     const policyIssues = inspector.inspect(userQuery);
 
-    // 4️⃣ GUARDRAIL REWRITE
+    // 4️⃣ Rewrite unsafe queries via Guardrails
     const rewritten = await scholaris.regenerateWithConstraints(
       userQuery,
       [...toxicityIssues, ...policyIssues]
     );
 
-    // 5️⃣ FINAL PROMPT
+    // 5️⃣ FINAL prompt for Groq
     const finalPrompt = `
 User Query:
 ${userQuery}
@@ -132,10 +147,10 @@ ${policyIssues.join(", ") || "none"}
 Toxic Flags:
 ${toxicityIssues.join(", ") || "none"}
 
-Relevant PropScholar Knowledge:
+Relevant Knowledge:
 ${ragResult.answer}
 
-Tone Behaviour:
+Tone Rules:
 ${ragResult.behaviour}
 
 Generate FINAL SAFE & ACCURATE PropScholar answer.
@@ -143,31 +158,40 @@ Generate FINAL SAFE & ACCURATE PropScholar answer.
 
     const finalReply = await askGroq(finalPrompt);
     msg.reply(finalReply);
+
   } catch (err) {
     console.error("BOT ERROR:", err);
     msg.reply("Something went wrong. Try again.");
   }
 });
 
-// ---------------- DISCORD START ----------------
+// ---------------------------------------------------
+// DISCORD START
+// ---------------------------------------------------
 client.once("ready", () => {
   console.log("🤖 Bot logged in & ready");
 });
 
 client.login(process.env.DISCORD_TOKEN);
 
-// ---------------- ROOT ROUTE ----------------
+// ---------------------------------------------------
+// EXPRESS ROOT
+// ---------------------------------------------------
 app.get("/", (req, res) => {
   res.send("PropScholar AI Bot Running");
 });
 
-// ---------------- WEB SERVER ----------------
+// ---------------------------------------------------
+// START WEB SERVER
+// ---------------------------------------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🌍 Server running on port ${PORT}`);
 });
 
-// ---------------- OPTIONAL INGEST ----------------
+// ---------------------------------------------------
+// OPTIONAL INGEST
+// ---------------------------------------------------
 if (process.env.INGEST_ON_STARTUP === "true") {
   import("./scripts/ingest-data").then(() => {
     console.log("📥 Automatic ingestion complete");

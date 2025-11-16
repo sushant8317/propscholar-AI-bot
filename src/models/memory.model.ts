@@ -1,13 +1,4 @@
-// src/models/memory.model.ts
 import mongoose from "mongoose";
-
-export interface IMemoryItem {
-  userId: string;
-  text: string;
-  summary?: string;
-  score?: number;
-  createdAt?: Date;
-}
 
 const MemorySchema = new mongoose.Schema(
   {
@@ -20,4 +11,7 @@ const MemorySchema = new mongoose.Schema(
   { collection: "memories" }
 );
 
-export const MemoryModel = mongoose.models.Memory || mongoose.model("Memory", MemorySchema);
+const MemoryModel =
+  mongoose.models.Memory || mongoose.model("Memory", MemorySchema);
+
+export default MemoryModel;

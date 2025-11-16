@@ -8,7 +8,6 @@ export class RAGService {
   private vector = new VectorService();
   private memory = new MemoryService();
 
-  // Behaviour tone
   private behaviourPrompt = `
 You are PropScholar Support.
 Explain answers strictly using PropScholar rules, models, payouts and policies.
@@ -16,16 +15,16 @@ Short sentences. Friendly tone. Human-like.
 Always stay inside PropScholar context.
   `;
 
-  // Synonym map
+  // Synonym expansion
   private SYNONYMS: Record<string, string[]> = {
-    plus: ["plus", "1-step", "2-step", "holding", "profitable"],
+    plus: ["plus", "1-step", "2-step", "profitable", "holding"],
     standard: ["standard", "consistency"],
-    daily: ["daily loss", "ddl", "intraday"],
-    max: ["max loss", "maximum loss"],
-    payout: ["scholarship", "withdraw", "cashout"],
+    daily: ["daily loss", "ddl"],
+    max: ["max loss"],
+    payout: ["scholarship", "withdraw"],
+    ufm: ["unfair means", "tick scalping"],
   };
 
-  // expand synonyms
   private expandQuery(q: string): string[] {
     const base = q.toLowerCase();
     const expanded = [base];
@@ -35,35 +34,43 @@ Always stay inside PropScholar context.
         expanded.push(...this.SYNONYMS[key]);
       }
     }
-
     return expanded;
   }
 
-  // 🔥 MAIN FUNCTION USED IN INDEX.TS
+  // MAIN RAG FUNCTION
   async generateResponse(userId: string, query: string) {
-    // user memory
-    const memoryContext = await this.memory.getContext(userId);
+    // 1️⃣ Memory handling
+    const mem = await this.memory.getMemory(userId);
 
-    // expand query
-    const expanded = this.expandQuery(query);
+    const memoryContext =
+      "Short-term: " +
+      mem.shortTerm.map((m: any) => m.text).join(" | ") +
+      "\nLong-term: " +
+      (mem.longTerm?.join(", ") || "none");
 
-    // RAG search
-    const embedding = await EmbedText(query);
-    const similar = await this.vector.findSimilar(embedding, 5, 0.40);
+    // 2️⃣ Expand synonyms
+    const expandedQueryParts = this.expandQuery(query);
+    const expandedQuery = expandedQueryParts.join(" ");
+
+    // 3️⃣ Embedding
+    const embedding = await EmbedText(expandedQuery);
+
+    // 4️⃣ RAG vector search
+    const results = await this.vector.findSimilar(embedding, 5, 0.40);
 
     let combined = "";
     let confidence = 0;
 
-    if (similar?.length) {
-      const best = similar[0];
-      combined = similar.map((s) => s.content).join("\n\n");
-      confidence = best.score;
+    if (results && results.length > 0) {
+      combined = results.map((r) => r.content).join("\n");
+      confidence = results[0].score;
     }
 
+    // 5️⃣ Return unified RAG package
     return {
-      answer: combined,
-      memory: memoryContext,
+      answer: combined || "No matching PropScholar rule found.",
       behaviour: this.behaviourPrompt,
+      memory: memoryContext,
       confidence,
     };
   }

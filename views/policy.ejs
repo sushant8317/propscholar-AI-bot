@@ -1,0 +1,26 @@
+<% include layout.ejs %>
+
+<% block body %>
+  <div class="py-4">
+    <h2>Policy Logs</h2>
+    <p class="text-muted">Policy detections</p>
+
+    <% if (!logs || logs.length === 0) { %>
+      <div class="alert alert-info">No policy logs found.</div>
+    <% } else { %>
+      <table class="table table-sm table-hover">
+        <thead><tr><th>When</th><th>User</th><th>Query</th><th>Issues</th></tr></thead>
+        <tbody>
+          <% logs.forEach(l => { %>
+            <tr>
+              <td><%= new Date(l.createdAt).toLocaleString() %></td>
+              <td><%= l.userId %></td>
+              <td><pre><%= l.query %></pre></td>
+              <td><%= l.issues.join(", ") %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+  </div>
+<% end %>

@@ -1,0 +1,27 @@
+<% include layout.ejs %>
+
+<% block body %>
+  <div class="py-4">
+    <h2>Knowledge Base</h2>
+    <p class="text-muted">All KB entries (question/answer) stored in DB</p>
+
+    <% if (!items || items.length === 0) { %>
+      <div class="alert alert-info">No KB items found.</div>
+    <% } else { %>
+      <table class="table table-sm table-hover">
+        <thead>
+          <tr><th>ID</th><th>Content (preview)</th><th>Keywords</th></tr>
+        </thead>
+        <tbody>
+          <% items.forEach(it => { %>
+            <tr>
+              <td><%= it._id %></td>
+              <td><pre style="max-height:80px;overflow:auto;"><%= it.content %></pre></td>
+              <td><%= (it.metadata && it.metadata.keywords) ? it.metadata.keywords.join(', ') : '' %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+  </div>
+<% end %>

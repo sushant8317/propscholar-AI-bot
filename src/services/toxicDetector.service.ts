@@ -1,14 +1,16 @@
-// src/services/toxicDetector.service.ts
 export class ToxicDetectorService {
-  // Very simple rule-based toxic filter
-  private badWords = ["fuck", "idiot", "shit", "bitch", "dogla"];
+  public rules = [
+    { keyword: "fuck", issue: "toxic-language" },
+    { keyword: "idiot", issue: "toxic-language" },
+    { keyword: "kill", issue: "violent-language" },
+  ];
 
-  async check(text: string): Promise<string[]> {
+  check(text: string): string[] {
     const lowered = text.toLowerCase();
     const issues: string[] = [];
 
-    for (const word of this.badWords) {
-      if (lowered.includes(word)) issues.push(`Toxic word detected: ${word}`);
+    for (const rule of this.rules) {
+      if (lowered.includes(rule.keyword)) issues.push(rule.issue);
     }
 
     return issues;

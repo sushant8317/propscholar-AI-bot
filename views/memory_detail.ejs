@@ -1,0 +1,14 @@
+<%- include("layout", { title: "User Memory" }) %>
+
+<h3>User: <%= userId %></h3>
+
+<h4>Short-Term Memory</h4>
+<ul>
+  <% mem.shortTerm.forEach(m => { %>
+    <li><%= m.createdAt.toLocaleString() %>: <%= m.text %></li>
+  <% }) %>
+</ul>
+
+<form method="post" action="/admin-ui/memory/<%= userId %>/delete">
+  <button>Delete All Memory</button>
+</form>
