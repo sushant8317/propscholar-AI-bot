@@ -1,106 +1,57 @@
-// src/services/rag.service.ts
-
+import { ConversationMemoryService } from "./conversationMemory.service";
+import { MemoryService } from "./memory.service";
 import { VectorService } from "./vector.service";
 import { EmbedText } from "./embedding.service";
 
 export class RAGService {
   private vector = new VectorService();
+  private memory = new MemoryService();
+  private convo = new ConversationMemoryService();
 
-  // Tone & speaking style
   private behaviourPrompt = `
-You are PropScholar Support.
-Always explain answers strictly using PropScholar rules, models, payouts, risk limits, and definitions.
-Speak like a human moderator — short sentences, friendly tone.
-Your reply format:
-1. Short direct answer
-2. Simple explanation
-3. Offer help or next step
-Never give general forex knowledge. Always answer in PropScholar context only.
-  `;
+You are Scholaris AI, PropScholar’s support agent.
+Use short sentences. Be direct. Be polite.
+Always stay inside PropScholar rules, models and payout structure.
+Never guess forex.
+`;
 
-  // Synonym expansion for better understanding
-  private SYNONYMS: Record<string, string[]> = {
-    "plus": ["plus", "1-step", "2-step", "holding", "profitable", "2 minutes"],
-    "standard": ["standard", "consistency", "45%", "1-step", "2-step"],
-    "daily": ["daily loss", "ddl", "drawdown", "intraday loss", "day loss"],
-    "max": ["max loss", "maximum loss", "total loss", "overall loss"],
-    "profit": ["profit target", "target", "percentage", "goal"],
-    "phase": ["phase 1", "phase 2", "phase1", "phase2", "step"],
-    "ufm": ["tick scalping", "unfair means", "forbidden", "toxic", "hft"],
-    "payout": ["scholarship", "payment", "withdraw", "cashout", "payout"],
+  private SYNONYMS = {
+    plus: ["plus", "holding", "1-step"],
+    standard: ["standard", "consistency"],
+    daily: ["daily loss"],
+    max: ["max loss"],
+    payout: ["withdraw", "scholarship"],
   };
 
-  private expandQuery(q: string): string[] {
+  private expandQuery(q: string) {
     const base = q.toLowerCase();
     const expanded = [base];
 
-    for (const key in this.SYNONYMS) {
-      if (base.includes(key)) {
-        expanded.push(...this.SYNONYMS[key]);
-      }
+    for (const k in this.SYNONYMS) {
+      if (base.includes(k)) expanded.push(...this.SYNONYMS[k]);
     }
-
     return expanded;
   }
 
-  async generateResponse(query: string) {
-    try {
-      const expandedQueryTerms = this.expandQuery(query);
-      const embedding = await EmbedText(query);
-      const similar = await this.vector.findSimilar(embedding, 5, 0.40); // lower threshold = smarter matching
+  async generate(userId: string, query: string) {
+    // Save to conversation memory
+    await this.convo.add(userId, query);
 
-      let combinedAnswers = "";
-      let confidence = 0;
+    const shortTerm = await this.convo.get(userId);
+    const longTerm = await this.memory.getContext(userId);
 
-      if (similar && similar.length > 0) {
-        const best = similar[0];
-        const blockLower = best.content.toLowerCase();
+    const expanded = this.expandQuery(query);
 
-        for (const term of expandedQueryTerms) {
-          if (blockLower.includes(term)) {
-            confidence += 0.15;
-          }
-        }
+    const embed = await EmbedText(query);
+    const similar = await this.vector.findSimilar(embed, 5, 0.40);
 
-        combinedAnswers = similar
-          .map((i: any) => i.content)
-          .join("\n\n");
+    let combined = similar?.map(x => x.content).join("\n") || "No KB match";
 
-        confidence = Math.min(1, best.score + confidence);
-      }
-
-      // Fallback for questions not in KB
-      if (!combinedAnswers || confidence < 0.35) {
-        combinedAnswers = `
-I couldn't find an exact match, but here is a PropScholar rules summary:
-
-• PropScholar has 4 models: Plus 1-Step, Plus 2-Step, Standard 1-Step, Standard 2-Step  
-• Plus = no consistency rule, but has 2-minute holding + 3 profitable days  
-• Standard = no holding time, but has 45% consistency rule  
-• Daily Loss resets at 00:00 UTC  
-• Maximum Loss is 6% or 8% depending on model  
-• News trading allowed  
-• Scholarship/payout processed within 4 hours  
-
-Ask me anything like:
-"daily loss?", "max loss?", "plus rules?", "standard rules?", "payout?", "consistency?", "holding time?"
-        `;
-        confidence = 0.30;
-      }
-
-      return {
-        answer: combinedAnswers,
-        behaviour: this.behaviourPrompt,
-        confidence,
-      };
-    } catch (err) {
-      console.error("RAG ERROR:", err);
-
-      return {
-        answer: "There was a technical issue. Please try again.",
-        behaviour: this.behaviourPrompt,
-        confidence: 0,
-      };
-    }
+    return {
+      behaviour: this.behaviourPrompt,
+      shortTerm,
+      longTerm,
+      knowledge: combined,
+    };
   }
 }

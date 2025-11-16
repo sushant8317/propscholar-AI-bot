@@ -11,6 +11,9 @@ import { router as adminRouter } from "./controllers/admin.controller";
 import { router as adminUIRouter } from "./controllers/admin-ui.controller";
 
 import { RAGService } from "./services/rag.service";
+import { ToxicDetectorService } from "./services/toxicDetector.service";
+import { PolicyInspectorService } from "./services/policyInspector.service";
+import { ScholarisService } from "./services/scholaris.service";
 
 dotenv.config();
 
@@ -31,7 +34,7 @@ app.use(
 app.use("/admin", adminRouter);
 app.use("/admin-ui", adminUIRouter);
 
-// ---------------- MONGODB ----------------
+// ---------------- DATABASE ----------------
 mongoose
   .connect(process.env.MONGODB_URI!)
   .then(() => console.log("✅ MongoDB connected"))
@@ -46,12 +49,16 @@ const client = new Client({
   ],
 });
 
+// ---------------- SERVICES ----------------
 const rag = new RAGService();
+const toxic = new ToxicDetectorService();
+const inspector = new PolicyInspectorService();
+const scholaris = new ScholarisService();
 
-// ---------------- LLM (GROQ) ----------------
+// ---------------- LLM CALL (GROQ) ----------------
 async function askGroq(prompt: string): Promise<string> {
   try {
-    const response = await axios.post(
+    const res = await axios.post(
       "https://api.groq.com/openai/v1/chat/completions",
       {
         model: "llama-3.1-8b-instant",
@@ -59,22 +66,16 @@ async function askGroq(prompt: string): Promise<string> {
           {
             role: "system",
             content: `
-You are Scholaris AI — PropScholar Support Assistant.
-
-Rules:
-- Speak like a calm human moderator.
-- Short sentences.
-- Clear explanations.
-- No emojis.
-- No robotic tone.
-- Only talk about PropScholar topics.
-- Never guess.
+You are Scholaris AI — PropScholar's support assistant.
+Short sentences. No emojis. Clear instructions.
+ALWAYS remain inside PropScholar rules, models, payouts, and policies.
+Never give general forex advice.
             `,
           },
           { role: "user", content: prompt },
         ],
         max_tokens: 350,
-        temperature: 0.6,
+        temperature: 0.5,
       },
       {
         headers: {
@@ -84,10 +85,10 @@ Rules:
       }
     );
 
-    return response.data.choices[0].message.content.trim();
+    return res.data.choices[0].message.content.trim();
   } catch (err: any) {
     console.error("LLM ERROR:", err.response?.data || err.message);
-    return "Something went wrong while generating the answer.";
+    return "Something went wrong generating a response.";
   }
 }
 
@@ -95,30 +96,53 @@ Rules:
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
 
+  const userQuery = msg.content.trim();
+  const userId = msg.author.id;
+
   try {
-    const userQuery = msg.content.trim();
+    // 1️⃣ TOXICITY CHECK
+    const toxicityIssues = await toxic.check(userQuery);
 
-    // STEP 1: Retrieve relevant KB context
-    const ragResult = await rag.generateResponse(userQuery);
+    // 2️⃣ RAG (KB + Memory)
+    const ragResult = await rag.generateResponse(userId, userQuery);
 
-    // STEP 2: Build final LLM prompt with RAG context
-    const llmPrompt = `
-User question:
-"${userQuery}"
+    // 3️⃣ POLICY INSPECTION
+    const policyIssues = inspector.inspect(userQuery);
+
+    // 4️⃣ GUARDRAILS (Rewrite unsafe queries)
+    const rewritten = await scholaris.regenerateWithConstraints(
+      userQuery,
+      [...toxicityIssues, ...policyIssues]
+    );
+
+    // 5️⃣ FINAL LLM PROMPT
+    const finalPrompt = `
+User Query:
+${userQuery}
+
+Rewritten Safe Version:
+${rewritten.answer}
+
+Short-Term + Long-Term Memory:
+${ragResult.memory}
+
+Policy Violations:
+${policyIssues.join(", ") || "none"}
+
+Toxic Flags:
+${toxicityIssues.join(", ") || "none"}
 
 Relevant PropScholar Knowledge:
-${ragResult.answer || "No exact match. Use PropScholar rules to answer correctly."}
+${ragResult.answer}
 
-Behaviour:
+Tone & Behaviour Rules:
 ${ragResult.behaviour}
 
-Now produce the final answer combining context + PropScholar policy.
-    `;
+Now generate FINAL SAFE & ACCURATE PropScholar answer.
+`;
 
-    // STEP 3: LLM reasoning
-    const finalReply = await askGroq(llmPrompt);
+    const finalReply = await askGroq(finalPrompt);
 
-    // STEP 4: Reply to user
     msg.reply(finalReply);
   } catch (err) {
     console.error("BOT ERROR:", err);
@@ -126,14 +150,14 @@ Now produce the final answer combining context + PropScholar policy.
   }
 });
 
-// ---------------- START DISCORD ----------------
+// ---------------- DISCORD START ----------------
 client.once("ready", () => {
   console.log("🤖 Bot logged in & ready");
 });
 
 client.login(process.env.DISCORD_TOKEN);
 
-// ---------------- EXPRESS ROOT ----------------
+// ---------------- ROOT ROUTE ----------------
 app.get("/", (req, res) => {
   res.send("PropScholar AI Bot Running");
 });
@@ -144,9 +168,9 @@ app.listen(PORT, () => {
   console.log(`🌍 Server running on port ${PORT}`);
 });
 
-// ---------------- OPTIONAL INGEST ON STARTUP ----------------
+// ---------------- OPTIONAL INGEST ----------------
 if (process.env.INGEST_ON_STARTUP === "true") {
   import("./scripts/ingest-data").then(() => {
-    console.log("📥 Automatic ingestion complete.");
+    console.log("📥 Automatic ingestion complete");
   });
 }
