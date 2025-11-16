@@ -1,111 +1,135 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>PropScholar Admin</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.24/dist/full.min.css" rel="stylesheet"/>
+    <meta charset="UTF-8" />
+    <title>PropScholar AI Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.24/dist/full.min.css" rel="stylesheet">
 </head>
 
-<body class="bg-[#0B0F19] text-gray-200">
+<body class="bg-[#0b0f19] text-gray-200">
 
-  <!-- NAV -->
-  <div class="navbar bg-[#111827] border-b border-gray-800 px-6">
-      <div class="flex-1">
-        <h1 class="text-2xl font-semibold text-blue-400">PropScholar AI Dashboard</h1>
-      </div>
-      <div class="flex-none gap-2">
-        <a href="/admin/new" class="btn btn-primary btn-sm">➕ Add New KB</a>
-        <button id="deleteSelectedBtn" class="btn btn-error btn-sm hidden">🗑 Delete Selected</button>
-      </div>
-  </div>
+<div class="navbar bg-[#111827] shadow-lg px-6">
+    <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 text-transparent bg-clip-text">
+        PropScholar AI Dashboard
+    </h1>
+    <div class="flex-1"></div>
+    <button onclick="refreshEmbeddings()" class="btn btn-primary btn-sm">
+        🔄 Refresh Embeddings
+    </button>
+</div>
 
-  <div class="px-8 py-6">
+<div class="p-6">
 
-    <!-- SEARCH -->
-    <input 
-      id="search"
-      class="input input-bordered w-full bg-[#111827] border-gray-700 text-gray-300 mb-6"
-      placeholder="Search knowledge base…"
-      onkeyup="searchKB()"
-    />
+    <!-- STATS -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="card bg-black/40 p-6 rounded-xl shadow-lg">
+            <h3 class="text-md text-gray-400">Total KBs</h3>
+            <p class="text-4xl font-bold"><%= docs.length %></p>
+        </div>
 
-    <!-- TABLE -->
-    <div class="overflow-x-auto bg-[#111827] rounded-xl p-4 border border-gray-800">
-      <table class="table table-zebra w-full text-gray-300">
-        <thead>
-          <tr>
-            <th><input type="checkbox" onchange="toggleAll(this)"/></th>
-            <th>#</th>
-            <th>Title</th>
-            <th>Category</th>
-            <th>Preview</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
+        <div class="card bg-black/40 p-6 rounded-xl shadow-lg">
+            <h3 class="text-md text-gray-400">Categories</h3>
+            <p class="text-4xl font-bold">
+                <%= [...new Set(docs.map(d => d.category))].length %>
+            </p>
+        </div>
 
-        <tbody id="kbTable">
-          <% docs.forEach((d, i) => { %>
-          <tr class="kb-row">
-            <td>
-              <input type="checkbox" class="rowCheck" data-id="<%= d._id %>"/>
-            </td>
-            <td><%= i + 1 %></td>
-            <td><%= d.title %></td>
-            <td><span class="badge badge-primary"><%= d.category %></span></td>
-            <td class="max-w-xs truncate text-gray-400"><%= d.content.substring(0, 70) %>...</td>
-            <td>
-              <a href="/admin/edit/<%= d._id %>" class="btn btn-info btn-xs">Edit</a>
-              <a href="/admin/delete/<%= d._id %>" class="btn btn-error btn-xs">Delete</a>
-            </td>
-          </tr>
-          <% }) %>
-        </tbody>
-      </table>
+        <div class="card bg-black/40 p-6 rounded-xl shadow-lg">
+            <h3 class="text-md text-gray-400">Embeddings</h3>
+            <p class="text-4xl font-bold text-green-400">Active</p>
+        </div>
+
+        <div class="card bg-black/40 p-6 rounded-xl shadow-lg">
+            <h3 class="text-md text-gray-400">Bot Status</h3>
+            <p id="bot-status" class="text-4xl font-bold text-green-400">Online</p>
+        </div>
     </div>
 
-  </div>
+    <!-- SEARCH + ADD -->
+    <div class="flex justify-between mt-8 mb-4">
+        <input id="search" onkeyup="searchKB()" placeholder="Search..." 
+               class="input input-bordered w-full max-w-lg" />
 
-  <script>
-    function searchKB() {
-      const term = document.getElementById("search").value.toLowerCase();
-      document.querySelectorAll(".kb-row").forEach(row => {
-        row.style.display = row.textContent.toLowerCase().includes(term) ? "" : "none";
-      });
-    }
+        <a href="/admin-ui/new" class="btn btn-success ml-4">➕ Add New KB</a>
+    </div>
 
-    function toggleAll(el) {
-      document.querySelectorAll(".rowCheck").forEach(c => c.checked = el.checked);
-      checkSelection();
-    }
+    <!-- MULTI DELETE -->
+    <button onclick="deleteSelected()" class="btn btn-error btn-sm mb-3">🗑 Delete Selected</button>
 
-    document.querySelectorAll(".rowCheck").forEach(c =>
-      c.addEventListener("change", checkSelection)
-    );
+    <!-- LIST -->
+    <div class="rounded-xl shadow-xl bg-black/30">
+        <table class="table table-zebra w-full">
+            <thead>
+                <tr>
+                    <th><input type="checkbox" onclick="selectAll(this)"></th>
+                    <th>#</th>
+                    <th>Title</th>
+                    <th>Category</th>
+                    <th>Preview</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="kbTable">
+                <% docs.forEach((d, i)=> { %>
+                <tr>
+                    <td>
+                        <input type="checkbox" class="selectItem" value="<%= d._id %>">
+                    </td>
+                    <td><%= i+1 %></td>
+                    <td><%= d.title %></td>
+                    <td><%= d.category %></td>
+                    <td class="truncate max-w-xs"><%= d.content.substring(0,80) %>...</td>
+                    <td>
+                        <a href="/admin-ui/edit/<%= d._id %>" class="btn btn-info btn-xs">Edit</a>
+                        <a href="/admin-ui/delete/<%= d._id %>" class="btn btn-error btn-xs">Delete</a>
+                    </td>
+                </tr>
+                <% }) %>
+            </tbody>
+        </table>
+    </div>
+</div>
 
-    function checkSelection() {
-      const selected = Array.from(document.querySelectorAll(".rowCheck"))
-                      .filter(x => x.checked).length;
-      document.getElementById("deleteSelectedBtn").classList.toggle("hidden", selected === 0);
-    }
+<script>
+function searchKB() {
+    const q = document.getElementById('search').value.toLowerCase();
+    document.querySelectorAll("#kbTable tr").forEach(row => {
+        row.style.display = row.innerText.toLowerCase().includes(q) ? "" : "none";
+    });
+}
 
-    document.getElementById("deleteSelectedBtn").addEventListener("click", async () => {
-      const ids = Array.from(document.querySelectorAll(".rowCheck"))
-        .filter(x => x.checked)
-        .map(x => x.dataset.id);
+async function refreshEmbeddings() {
+    if (!confirm("Refresh embeddings?")) return;
 
-      if (!confirm(`Delete ${ids.length} KB items?`)) return;
+    const res = await fetch('/admin-ui/refresh-embeddings', {
+        method: "POST"
+    });
 
-      await fetch("/admin/delete-multiple", {
+    const data = await res.json();
+    alert(data.message);
+}
+
+function selectAll(box) {
+    document.querySelectorAll('.selectItem').forEach(cb => cb.checked = box.checked);
+}
+
+async function deleteSelected() {
+    const ids = [...document.querySelectorAll('.selectItem:checked')].map(cb => cb.value);
+
+    if (ids.length === 0) return alert("Select items first");
+
+    const res = await fetch('/admin-ui/delete-multiple', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids })
-      });
-
-      location.reload();
     });
-  </script>
+
+    const data = await res.json();
+    alert(data.message);
+    location.reload();
+}
+</script>
 
 </body>
 </html>
