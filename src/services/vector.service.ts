@@ -1,6 +1,6 @@
 // src/services/vector.service.ts
 
-import KnowledgeModel from "../models/knowledge.model"; // ✅ FIXED: default import
+import { KnowledgeModel } from "../models/knowledge.model";
 
 export class VectorService {
 
