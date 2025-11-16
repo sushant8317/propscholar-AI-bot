@@ -1,4 +1,5 @@
-// src/models/knowledge.model.ts (as you posted)
+// src/models/knowledge.model.ts
+
 import mongoose, { Schema, Document } from "mongoose";
 
 export interface IKnowledge extends Document {
