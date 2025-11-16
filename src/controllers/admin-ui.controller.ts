@@ -1,52 +1,47 @@
-// src/controllers/admin-ui.controller.ts
 import express, { Request, Response } from "express";
 import MemoryModel from "../models/memory.model";
+import KBEntry from "../models/kbEntry.model";  // your KB schema (rename if needed)
 
 export const router = express.Router();
 
-// Dashboard Home
+// ----------------------
+// ADMIN UI DASHBOARD
+// ----------------------
 router.get("/", async (req: Request, res: Response) => {
-  try {
-    const entries = await MemoryModel.find()
-      .sort({ createdAt: -1 })
-      .limit(200);
+    try {
+        // Fetch all KB docs
+        const docs = await KBEntry.find().lean();
 
-    // Important: Render from /views/admin/index.ejs
-    res.render("admin/index", { entries });
-  } catch (err) {
-    console.error("Admin UI Error:", err);
-    res.status(500).send("Dashboard Error");
-  }
+        // Categories extracted from docs
+        const categories = [...new Set(docs.map(d => d.category || "General"))];
+
+        res.render("admin/index", {
+            docs,
+            categories,
+            botStatus: true  // placeholder
+        });
+
+    } catch (err) {
+        console.error("Dashboard render error:", err);
+        res.status(500).send("Dashboard crashed.");
+    }
 });
 
-// Teach Page
-router.get("/teach", (req: Request, res: Response) => {
-  res.render("admin/teach");
+// OPTIONAL: /admin-ui/dashboard → same page
+router.get("/dashboard", async (req: Request, res: Response) => {
+    try {
+        const docs = await KBEntry.find().lean();
+        const categories = [...new Set(docs.map(d => d.category || "General"))];
+
+        res.render("admin/index", {
+            docs,
+            categories,
+            botStatus: true
+        });
+    } catch (err) {
+        console.error("Dashboard crashed:", err);
+        res.status(500).send("Dashboard crashed.");
+    }
 });
 
-router.post("/teach", async (req: Request, res: Response) => {
-  try {
-    await MemoryModel.create({
-      userId: "system",
-      text: req.body.text,
-      summary: "",
-      score: 0
-    });
-
-    res.redirect("/admin-ui");
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error saving memory");
-  }
-});
-
-// View single memory detail (optional)
-router.get("/memory/:id", async (req: Request, res: Response) => {
-  try {
-    const item = await MemoryModel.findById(req.params.id);
-    res.render("admin/memory_detail", { item });
-  } catch (err) {
-    console.error(err);
-    res.status(500).send("Error");
-  }
-});
+export default router;
