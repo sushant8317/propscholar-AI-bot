@@ -1,12 +1,12 @@
 // src/services/vector.service.ts
 
-import { Knowledge } from "../models/knowledge.model";
+import KnowledgeModel from "../models/knowledge.model"; // ✅ FIXED: default import
 
 export class VectorService {
 
-  // ----------------------------------------
-  // Cosine Similarity
-  // ----------------------------------------
+  // -------------------------------------------------
+  // COSINE SIMILARITY
+  // -------------------------------------------------
   private cosineSimilarity(a: number[], b: number[]): number {
     if (!a || !b || a.length === 0 || b.length === 0) return 0;
 
@@ -14,13 +14,12 @@ export class VectorService {
     const magA = Math.sqrt(a.reduce((s, v) => s + v * v, 0));
     const magB = Math.sqrt(b.reduce((s, v) => s + v * v, 0));
 
-    if (magA === 0 || magB === 0) return 0;
-    return dot / (magA * magB);
+    return magA && magB ? dot / (magA * magB) : 0;
   }
 
-  // ----------------------------------------
-  // UPSERT EMBEDDING (clean, correct)
-  // ----------------------------------------
+  // -------------------------------------------------
+  // UPSERT EMBEDDING — CLEAN & CORRECT
+  // -------------------------------------------------
   async upsertEmbedding(
     id: string,
     content: string,
@@ -28,13 +27,15 @@ export class VectorService {
     metadata: any
   ) {
     try {
-      return await Knowledge.findOneAndUpdate(
-        { id },                           // ✅ store by ID directly
+      return await KnowledgeModel.findOneAndUpdate(
+        { "metadata.sourceId": id },  // 🔥 MATCH by metadata.sourceId
         {
-          id,
           content,
           embedding,
-          metadata
+          metadata: {
+            ...metadata,
+            sourceId: id,
+          }
         },
         { upsert: true, new: true }
       );
@@ -44,27 +45,24 @@ export class VectorService {
     }
   }
 
-  // ----------------------------------------
-  // FIND SIMILAR DOCS (RAG retrieval)
-  // ----------------------------------------
-  async findSimilar(queryEmbedding: number[], topK = 7, min = 0.20) {
-    const allDocs = await Knowledge.find().lean();
+  // -------------------------------------------------
+  // FIND SIMILAR DOCS — RAG
+  // -------------------------------------------------
+  async findSimilar(queryEmbedding: number[], topK = 7, minScore = 0.20) {
+    const docs = await KnowledgeModel.find().lean();
 
-    // Filter out empty embeddings
-    const validDocs = allDocs.filter(
+    const valid = docs.filter(
       (d: any) => Array.isArray(d.embedding) && d.embedding.length > 0
     );
 
-    // Score each doc
-    const scored = validDocs.map((doc: any) => ({
+    const scored = valid.map((doc: any) => ({
       ...doc,
       score: this.cosineSimilarity(queryEmbedding, doc.embedding)
     }));
 
-    // Sort + filter by threshold
     return scored
-      .filter((x: any) => x.score >= min)
-      .sort((a: any, b: any) => b.score - a.score)
+      .filter((x) => x.score >= minScore)
+      .sort((a, b) => b.score - a.score)
       .slice(0, topK);
   }
 }
