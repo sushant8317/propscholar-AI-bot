@@ -1,32 +1,23 @@
 import mongoose, { Schema, Document } from "mongoose";
 
 export interface IKnowledge extends Document {
+  title: string;
+  category: string;
   content: string;
   embedding: number[];
-  metadata: {
-    source?: string;
-    sourceId?: string;   // <-- REQUIRED
-    title?: string;
-    url?: string;
-    category?: string;
-    question?: string;
-    keywords?: string[];
-    [key: string]: any;
-  };
 }
 
-const KnowledgeSchema = new Schema<IKnowledge>({
-  content: { type: String, required: true },
-  embedding: { type: [Number], required: true },
+const KnowledgeSchema = new Schema<IKnowledge>(
+  {
+    title: { type: String, required: true },
+    category: { type: String, required: true },
+    content: { type: String, required: true },
+    embedding: { type: [Number], default: [] }
+  },
+  { timestamps: true }
+);
 
-  metadata: {
-    type: Object,
-    default: {},
-  }
-}, { strict: false });  // <-- ALLOWS ANY metadata fields
-// IMPORTANT 🔥🔥🔥
-
-export const Knowledge = mongoose.model<IKnowledge>(
+export const KnowledgeModel = mongoose.model<IKnowledge>(
   "Knowledge",
   KnowledgeSchema
 );
