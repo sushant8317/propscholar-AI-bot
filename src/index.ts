@@ -24,6 +24,10 @@ const app = express();
 app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true }));
 
+// VIEW ENGINE
+app.set("views", path.join(__dirname, "views"));
+app.set("view engine", "ejs");
+
 // ---------------------------------------------------
 // SECURITY — protect ONLY /admin API
 // DO NOT protect /admin-ui dashboard
