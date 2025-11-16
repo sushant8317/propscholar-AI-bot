@@ -1,30 +1,25 @@
 // src/controllers/admin-ui.controller.ts
 import express, { Request, Response } from "express";
-import { MemoryModel } from "../models/memory.model";
+import MemoryModel from "../models/memory.model";
 
 export const router = express.Router();
 
-// --------------------
-// ADMIN UI DASHBOARD
-// --------------------
+// Dashboard Home
 router.get("/", async (req: Request, res: Response) => {
   try {
     const entries = await MemoryModel.find()
       .sort({ createdAt: -1 })
       .limit(200);
 
-    // 👉 VERY IMPORTANT: point to "admin/index"
+    // Important: Render from /views/admin/index.ejs
     res.render("admin/index", { entries });
-
   } catch (err) {
     console.error("Admin UI Error:", err);
     res.status(500).send("Dashboard Error");
   }
 });
 
-// --------------------
-// TEACH PAGE
-// --------------------
+// Teach Page
 router.get("/teach", (req: Request, res: Response) => {
   res.render("admin/teach");
 });
@@ -37,9 +32,21 @@ router.post("/teach", async (req: Request, res: Response) => {
       summary: "",
       score: 0
     });
+
     res.redirect("/admin-ui");
   } catch (err) {
     console.error(err);
     res.status(500).send("Error saving memory");
+  }
+});
+
+// View single memory detail (optional)
+router.get("/memory/:id", async (req: Request, res: Response) => {
+  try {
+    const item = await MemoryModel.findById(req.params.id);
+    res.render("admin/memory_detail", { item });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Error");
   }
 });
