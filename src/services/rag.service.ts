@@ -1,4 +1,4 @@
-import { ConversationMemoryService } from "./conversationMemory.service";
+import { MemoryService } from "./memory.service";
 import { MemoryService } from "./memory.service";
 import { VectorService } from "./vector.service";
 import { EmbedText } from "./embedding.service";
