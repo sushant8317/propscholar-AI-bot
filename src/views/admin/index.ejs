@@ -1,88 +1,76 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="business">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PropScholar AI Dashboard</title>
-
+    <title>PropScholar Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.24/dist/full.min.css" rel="stylesheet">
-
-    <style>
-        body {
-            background: #000;
-        }
-        .card-black {
-            background: #0a0a0a !important;
-            border: 1px solid #111;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-        }
-        .neon {
-            color: #4cfaff;
-        }
-    </style>
 </head>
 
-<body class="text-gray-200">
+<body class="bg-base-200">
 
-    <div class="navbar bg-black border-b border-gray-800 shadow-xl">
+    <!-- NAVBAR -->
+    <div class="navbar bg-base-100 shadow">
         <div class="flex-1">
-            <h1 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-600">
+            <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 text-transparent bg-clip-text">
                 PropScholar AI Dashboard
             </h1>
         </div>
-
-        <button onclick="refreshEmbeddings()" class="btn btn-info btn-sm">Refresh Embeddings</button>
+        <div>
+            <button onclick="refreshEmbeddings()" class="btn btn-primary btn-sm">
+                🔄 Refresh Embeddings
+            </button>
+        </div>
     </div>
 
-    <div class="p-8">
+    <div class="container mx-auto p-6">
 
-        <!-- Stats -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-            <div class="card card-black p-6 rounded-xl">
-                <div class="text-lg">Total KBs</div>
-                <div class="text-4xl font-bold neon"><%= docs.length %></div>
+        <!-- STATS -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+
+            <div class="card card-black p-6 rounded-xl bg-base-100 shadow-lg">
+                <div class="text-xl font-bold text-white">Total KBs</div>
+                <div class="text-4xl font-extrabold text-primary"><%= total %></div>
             </div>
 
-            <div class="card card-black p-6 rounded-xl">
-                <div class="text-lg">Categories</div>
-                <div class="text-4xl font-bold neon"><%= categories %></div>
+            <div class="card card-black p-6 rounded-xl bg-base-100 shadow-lg">
+                <div class="text-xl font-bold text-white">Categories</div>
+                <div class="text-4xl font-extrabold text-secondary"><%= categories.length %></div>
             </div>
 
-            <div class="card card-black p-6 rounded-xl">
-                <div class="text-lg">Embeddings</div>
-                <div class="text-4xl font-bold text-green-400">Active</div>
+            <div class="card card-black p-6 rounded-xl bg-base-100 shadow-lg">
+                <div class="text-xl font-bold text-white">Embeddings</div>
+                <div class="text-4xl font-extrabold text-accent">Active</div>
             </div>
 
-            <div class="card card-black p-6 rounded-xl">
-                <div class="text-lg">Bot Status</div>
-                <div id="bot-status" class="text-4xl font-bold text-green-400">Online</div>
-            </div>
-        </div>
-
-
-        <!-- Tools -->
-        <div class="flex items-center justify-between mb-4">
-            <input id="search" onkeyup="searchKB()"
-                   placeholder="Search..."
-                   class="input input-bordered w-1/3 bg-black border-gray-700"/>
-
-            <div class="flex items-center gap-3">
-                <button id="deleteSelected" class="btn btn-error btn-sm hidden" onclick="deleteSelectedKB()">
-                    Delete Selected
-                </button>
-
-                <a href="/admin/new" class="btn btn-success btn-sm">Add New KB</a>
+            <div class="card card-black p-6 rounded-xl bg-base-100 shadow-lg">
+                <div class="text-xl font-bold text-white">Bot Status</div>
+                <div id="bot-status" class="text-4xl font-extrabold text-success">Online</div>
             </div>
         </div>
 
+        <!-- SEARCH + ACTIONS -->
+        <div class="flex flex-col md:flex-row gap-4 mb-6">
+            <input id="search" placeholder="🔍 Search..." class="input input-bordered w-full" onkeyup="searchKB()">
 
-        <!-- Table -->
-        <div class="overflow-x-auto rounded-xl">
-            <table class="table w-full text-gray-300">
-                <thead class="bg-black border-b border-gray-800">
+            <button onclick="deleteSelected()" class="btn btn-error">
+                🗑 Delete Selected
+            </button>
+
+            <a href="/admin/new" class="btn btn-success">
+                ➕ Add New KB
+            </a>
+        </div>
+
+        <!-- TABLE -->
+        <div class="bg-base-100 rounded-xl shadow-xl overflow-hidden">
+            <table class="table table-zebra w-full">
+                <thead>
                     <tr>
-                        <th><input type="checkbox" id="selectAll" onclick="toggleAll(this)" /></th>
+                        <th>
+                            <input type="checkbox" onclick="toggleAll(this)" />
+                        </th>
                         <th>#</th>
                         <th>Title</th>
                         <th>Category</th>
@@ -92,65 +80,74 @@
                 </thead>
 
                 <tbody id="kbTable">
-                    <% docs.forEach((d, i) => { %>
-                    <tr class="hover:bg-gray-900">
-                        <td>
-                            <input type="checkbox" class="selectItem" value="<%= d._id %>" onclick="toggleDeleteButton()"/>
-                        </td>
-                        <td><%= i + 1 %></td>
 
-                        <td class="font-semibold text-white"><%= d.title %></td>
-
+                <% docs.forEach((d, i) => { %>
+                    <tr class="hover kb-row">
                         <td>
-                            <span class="badge badge-info"><%= d.category %></span>
+                            <input type="checkbox" class="selectItem" value="<%= d._id %>">
                         </td>
 
-                        <td class="max-w-xs truncate text-gray-400">
-                            <%= d.content.substring(0, 90) %>...
+                        <td><%= i+1 %></td>
+
+                        <td class="font-semibold"><%= d.title %></td>
+
+                        <td>
+                            <span class="badge badge-primary"><%= d.category %></span>
+                        </td>
+
+                        <td class="max-w-xs truncate">
+                            <%= d.content.substring(0, 80) %>...
                         </td>
 
                         <td>
                             <a href="/admin/edit/<%= d._id %>" class="btn btn-info btn-xs">Edit</a>
-                            <a href="/admin/delete/<%= d._id %>" class="btn btn-error btn-xs"
-                               onclick="return confirm('Delete this KB?')">Delete</a>
+                            <a href="/admin/delete/<%= d._id %>" class="btn btn-error btn-xs">Delete</a>
                         </td>
                     </tr>
-                    <% }) %>
+                <% }) %>
+
                 </tbody>
             </table>
         </div>
 
     </div>
 
-<script>
+    <script>
+        function toggleAll(master) {
+            document.querySelectorAll(".selectItem")
+                .forEach(x => x.checked = master.checked);
+        }
 
-function toggleAll(src) {
-    const items = document.querySelectorAll('.selectItem');
-    items.forEach(i => i.checked = src.checked);
-    toggleDeleteButton();
-}
+        function searchKB() {
+            const q = document.getElementById("search").value.toLowerCase();
+            document.querySelectorAll(".kb-row").forEach(row => {
+                row.style.display = row.textContent.toLowerCase().includes(q) ? "" : "none";
+            });
+        }
 
-function toggleDeleteButton() {
-    const selected = document.querySelectorAll('.selectItem:checked').length;
-    const btn = document.getElementById('deleteSelected');
-    btn.classList.toggle("hidden", selected === 0);
-}
+        async function deleteSelected() {
+            const ids = [...document.querySelectorAll(".selectItem:checked")].map(x => x.value);
 
-async function deleteSelectedKB() {
-    if (!confirm("Delete selected KBs?")) return;
+            if (ids.length === 0)
+                return alert("No KBs selected.");
 
-    const ids = [...document.querySelectorAll('.selectItem:checked')].map(x=>x.value);
+            if (!confirm("Delete selected KBs?"))
+                return;
 
-    const res = await fetch('/admin/delete-multiple', {
-        method: 'POST',
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids })
-    });
+            const res = await fetch("/admin-ui/delete-multiple", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids })
+            });
 
-    location.reload();
-}
+            const data = await res.json();
 
-</script>
+            if (data.success) {
+                alert("Deleted " + data.deleted + " items");
+                location.reload();
+            }
+        }
+    </script>
 
 </body>
 </html>
