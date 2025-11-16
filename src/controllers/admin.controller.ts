@@ -1,20 +1,43 @@
-import { Router } from "express";
+import express from "express";
 import { KnowledgeModel } from "../models/knowledge.model";
 
-export const router = Router();
+export const router = express.Router();
 
-// API: Get all KB entries
-router.get("/kb", async (req, res) => {
-  const docs = await KnowledgeModel.find().lean();
-  res.json({ ok: true, docs });
+// LIST
+router.get("/", async (req, res) => {
+  const docs = await KnowledgeModel.find();
+  res.render("admin/index", { docs });
 });
 
-// API: Bot status check
-router.get("/bot-status", (req, res) => {
-  res.json({ isOnline: true });
+// NEW
+router.get("/new", (req, res) => {
+  res.render("admin/new");
 });
 
-// API: Refresh embeddings (placeholder)
-router.post("/refresh-embeddings", async (req, res) => {
-  return res.json({ message: "Embeddings refreshed (placeholder)" });
+router.post("/new", async (req, res) => {
+  await KnowledgeModel.create(req.body);
+  res.redirect("/admin-ui");
+});
+
+// EDIT
+router.get("/edit/:id", async (req, res) => {
+  const doc = await KnowledgeModel.findById(req.params.id);
+  res.render("admin/edit", { doc });
+});
+
+router.post("/edit/:id", async (req, res) => {
+  await KnowledgeModel.findByIdAndUpdate(req.params.id, req.body);
+  res.redirect("/admin-ui");
+});
+
+// DELETE single
+router.get("/delete/:id", async (req, res) => {
+  await KnowledgeModel.findByIdAndDelete(req.params.id);
+  res.redirect("/admin-ui");
+});
+
+// DELETE multiple
+router.post("/delete-multiple", async (req, res) => {
+  await KnowledgeModel.deleteMany({ _id: { $in: req.body.ids } });
+  res.json({ success: true });
 });

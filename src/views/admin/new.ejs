@@ -1,25 +1,48 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
-  <meta charset="UTF-8">
-  <title>Add KB</title>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Add Knowledge Base</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.24/dist/full.min.css" rel="stylesheet"/>
 </head>
-<body class="p-10">
 
-<h1 class="text-3xl mb-5">Add Knowledge Base Entry</h1>
+<body class="bg-[#0B0F19] text-gray-200 px-10 py-10">
 
-<form action="/admin-ui/new" method="POST" class="space-y-4">
+  <div class="max-w-2xl mx-auto bg-[#111827] p-8 rounded-xl border border-gray-800 shadow-xl">
 
-  <input name="title" placeholder="Title" class="input input-bordered w-full" />
+    <h2 class="text-2xl font-semibold text-blue-400 mb-6">Add New Knowledge Base</h2>
 
-  <input name="category" placeholder="Category" class="input input-bordered w-full" />
+    <form action="/admin/new" method="POST" class="flex flex-col gap-5">
 
-  <textarea name="content" placeholder="Content" class="textarea textarea-bordered w-full h-40"></textarea>
+      <div>
+        <label class="font-medium">Title</label>
+        <input name="title" required
+               class="input input-bordered w-full bg-[#0D1220] border-gray-700 text-gray-300"/>
+      </div>
 
-  <button class="btn btn-primary">Save</button>
+      <div>
+        <label class="font-medium">Category</label>
+        <input name="category" required
+               class="input input-bordered w-full bg-[#0D1220] border-gray-700 text-gray-300"/>
+      </div>
 
-</form>
+      <div>
+        <label class="font-medium">Content</label>
+        <textarea name="content" rows="6" required
+                  class="textarea textarea-bordered w-full bg-[#0D1220] border-gray-700 text-gray-300"></textarea>
+      </div>
+
+      <button class="btn btn-primary w-full mt-4">Save KB</button>
+
+    </form>
+
+    <div class="mt-4 text-center">
+      <a href="/admin-ui" class="text-blue-400">← Back to Dashboard</a>
+    </div>
+
+  </div>
 
 </body>
 </html>
