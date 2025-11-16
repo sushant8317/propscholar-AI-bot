@@ -1,16 +1,16 @@
 // src/controllers/admin.controller.ts
 import express from "express";
-import KnowledgeModel from "../models/knowledge.model";
+import { KnowledgeModel } from "../models/knowledge.model";
 
 export const router = express.Router();
 
-// LIST ALL KB JSON
+// LIST ALL
 router.get("/", async (req, res) => {
   const docs = await KnowledgeModel.find();
   res.json(docs);
 });
 
-// CREATE KB
+// NEW KB
 router.post("/new", async (req, res) => {
   await KnowledgeModel.create(req.body);
   res.redirect("/admin-ui");
@@ -28,7 +28,7 @@ router.post("/edit/:id", async (req, res) => {
   res.redirect("/admin-ui");
 });
 
-// DELETE ONE
+// DELETE 1
 router.get("/delete/:id", async (req, res) => {
   await KnowledgeModel.findByIdAndDelete(req.params.id);
   res.redirect("/admin-ui");
