@@ -10,12 +10,14 @@ export class RAGService {
 
   private behaviourPrompt = `
 You are PropScholar Support.
-Explain answers strictly using PropScholar rules, models, payouts and policies.
+Explain strictly using PropScholar rules, models, payouts and policies.
 Short sentences. Friendly tone. Human-like.
 Always stay inside PropScholar context.
   `;
 
-  // Synonym expansion
+  // ----------------------------------------
+  // SYNONYM EXPANSION
+  // ----------------------------------------
   private SYNONYMS: Record<string, string[]> = {
     plus: ["plus", "1-step", "2-step", "profitable", "holding"],
     standard: ["standard", "consistency"],
@@ -30,43 +32,52 @@ Always stay inside PropScholar context.
     const expanded = [base];
 
     for (const key in this.SYNONYMS) {
-      if (base.includes(key)) {
-        expanded.push(...this.SYNONYMS[key]);
-      }
+      if (base.includes(key)) expanded.push(...this.SYNONYMS[key]);
     }
     return expanded;
   }
 
-  // MAIN RAG FUNCTION
+  // ----------------------------------------
+  // MAIN RAG ENGINE
+  // ----------------------------------------
   async generateResponse(userId: string, query: string) {
-    // 1️⃣ Memory handling
+    // 1️⃣ MEMORY FETCH
     const mem = await this.memory.getMemory(userId);
+
+    // FIX: longTerm is array of objects
+    const longTermText =
+      mem.longTerm && mem.longTerm.length > 0
+        ? mem.longTerm.map((m: any) => m.text).join(" | ")
+        : "none";
 
     const memoryContext =
       "Short-term: " +
       mem.shortTerm.map((m: any) => m.text).join(" | ") +
       "\nLong-term: " +
-      (mem.longTerm?.join(", ") || "none");
+      longTermText;
 
-    // 2️⃣ Expand synonyms
-    const expandedQueryParts = this.expandQuery(query);
-    const expandedQuery = expandedQueryParts.join(" ");
+    // 2️⃣ SYNONYM EXPANSION
+    const expandedQuery = this.expandQuery(query).join(" ");
 
-    // 3️⃣ Embedding
+    // 3️⃣ EMBEDDING
     const embedding = await EmbedText(expandedQuery);
 
-    // 4️⃣ RAG vector search
+    // 4️⃣ VECTOR SEARCH
     const results = await this.vector.findSimilar(embedding, 5, 0.40);
 
     let combined = "";
     let confidence = 0;
 
     if (results && results.length > 0) {
-      combined = results.map((r) => r.content).join("\n");
-      confidence = results[0].score;
+      combined = results
+        .map((r: any) => r?.content || "")
+        .filter(Boolean)
+        .join("\n");
+
+      confidence = results[0].score || 0;
     }
 
-    // 5️⃣ Return unified RAG package
+    // 5️⃣ FINAL OUTPUT
     return {
       answer: combined || "No matching PropScholar rule found.",
       behaviour: this.behaviourPrompt,
