@@ -5,12 +5,12 @@ import mongoose from "mongoose";
 import { Client, GatewayIntentBits } from "discord.js";
 import bodyParser from "body-parser";
 import basicAuth from "express-basic-auth";
+import axios from "axios";
 
 import { router as adminRouter } from "./controllers/admin.controller";
 import { router as adminUIRouter } from "./controllers/admin-ui.controller";
 
 import { RAGService } from "./services/rag.service";
-import axios from "axios";
 
 dotenv.config();
 
@@ -48,7 +48,7 @@ const client = new Client({
 
 const rag = new RAGService();
 
-// ========== LLM CALL (GROQ) ==========
+// ---------------- LLM (GROQ) ----------------
 async function askGroq(prompt: string): Promise<string> {
   try {
     const response = await axios.post(
@@ -59,23 +59,21 @@ async function askGroq(prompt: string): Promise<string> {
           {
             role: "system",
             content: `
-You are Scholaris AI — PropScholar's support assistant.
-You speak like a human moderator:
-- short sentences
-- friendly but professional
-- clear explanations
-- no emojis
-- no robotic tone
-- always PropScholar context
-- never guess unrelated topics
+You are Scholaris AI — PropScholar Support Assistant.
+
+Rules:
+- Speak like a calm human moderator.
+- Short sentences.
+- Clear explanations.
+- No emojis.
+- No robotic tone.
+- Only talk about PropScholar topics.
+- Never guess.
             `,
           },
-          {
-            role: "user",
-            content: prompt,
-          },
+          { role: "user", content: prompt },
         ],
-        max_tokens: 300,
+        max_tokens: 350,
         temperature: 0.6,
       },
       {
@@ -89,7 +87,7 @@ You speak like a human moderator:
     return response.data.choices[0].message.content.trim();
   } catch (err: any) {
     console.error("LLM ERROR:", err.response?.data || err.message);
-    return "Something went wrong generating a response.";
+    return "Something went wrong while generating the answer.";
   }
 }
 
@@ -100,27 +98,27 @@ client.on("messageCreate", async (msg) => {
   try {
     const userQuery = msg.content.trim();
 
-    // 1. Retrieve relevant KB context
+    // STEP 1: Retrieve relevant KB context
     const ragResult = await rag.generateResponse(userQuery);
 
-    // 2. Build intelligent prompt
+    // STEP 2: Build final LLM prompt with RAG context
     const llmPrompt = `
 User question:
 "${userQuery}"
 
-Relevant PropScholar knowledge:
-${ragResult.answer || "No direct match found, answer using policy understanding."}
+Relevant PropScholar Knowledge:
+${ragResult.answer || "No exact match. Use PropScholar rules to answer correctly."}
 
-Tone rules:
+Behaviour:
 ${ragResult.behaviour}
 
-Now give the final answer combining understanding + knowledge.
+Now produce the final answer combining context + PropScholar policy.
     `;
 
-    // 3. AI reasoning
+    // STEP 3: LLM reasoning
     const finalReply = await askGroq(llmPrompt);
 
-    // 4. Reply to user
+    // STEP 4: Reply to user
     msg.reply(finalReply);
   } catch (err) {
     console.error("BOT ERROR:", err);
@@ -146,7 +144,7 @@ app.listen(PORT, () => {
   console.log(`🌍 Server running on port ${PORT}`);
 });
 
-// ---------------- OPTIONAL INGEST ----------------
+// ---------------- OPTIONAL INGEST ON STARTUP ----------------
 if (process.env.INGEST_ON_STARTUP === "true") {
   import("./scripts/ingest-data").then(() => {
     console.log("📥 Automatic ingestion complete.");
