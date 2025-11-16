@@ -37,3 +37,13 @@ router.get("/delete/:id", async (req, res) => {
   await KnowledgeModel.findByIdAndDelete(req.params.id);
   res.redirect("/admin-ui");
 });
+
+router.get("/", async (req, res) => {
+  const docs = await KnowledgeModel.find();
+  const categories = new Set(docs.map(d => d.category)).size;
+
+  res.render("admin/index", {
+    docs,
+    categories
+  });
+});

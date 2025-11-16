@@ -41,3 +41,15 @@ router.post("/delete-multiple", async (req, res) => {
   await KnowledgeModel.deleteMany({ _id: { $in: req.body.ids } });
   res.json({ success: true });
 });
+
+router.post("/delete-multiple", async (req, res) => {
+  const { ids } = req.body;
+
+  if (!ids || !Array.isArray(ids)) {
+    return res.status(400).json({ error: "Invalid IDs" });
+  }
+
+  await KnowledgeModel.deleteMany({ _id: { $in: ids } });
+
+  res.json({ message: "Deleted successfully" });
+});

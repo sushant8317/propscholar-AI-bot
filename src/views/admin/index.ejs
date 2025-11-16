@@ -1,114 +1,155 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="business">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PropScholar AI Admin</title>
+    <title>PropScholar AI Dashboard</title>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.24/dist/full.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            background: #000;
+        }
+        .card-black {
+            background: #0a0a0a !important;
+            border: 1px solid #111;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        .neon {
+            color: #4cfaff;
+        }
+    </style>
 </head>
 
-<body class="bg-base-200">
-    <!-- Navbar -->
-    <div class="navbar bg-base-100 shadow-xl">
+<body class="text-gray-200">
+
+    <div class="navbar bg-black border-b border-gray-800 shadow-xl">
         <div class="flex-1">
-            <h1 class="text-3xl font-bold bg-gradient-to-r from-blue-500 to-purple-600 text-transparent bg-clip-text">
+            <h1 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-purple-600">
                 PropScholar AI Dashboard
             </h1>
         </div>
-        <div>
-            <button onclick="refreshEmbeddings()" class="btn btn-primary btn-sm">🔄 Refresh Embeddings</button>
-        </div>
+
+        <button onclick="refreshEmbeddings()" class="btn btn-info btn-sm">Refresh Embeddings</button>
     </div>
 
-    <div class="container mx-auto p-6">
+    <div class="p-8">
 
         <!-- Stats -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div class="stat bg-base-100 shadow-lg rounded-xl">
-                <div class="stat-title">Total KBs</div>
-                <div class="stat-value text-primary"><%= docs.length %></div>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+            <div class="card card-black p-6 rounded-xl">
+                <div class="text-lg">Total KBs</div>
+                <div class="text-4xl font-bold neon"><%= docs.length %></div>
             </div>
 
-            <div class="stat bg-base-100 shadow-lg rounded-xl">
-                <div class="stat-title">Categories</div>
-                <div class="stat-value text-secondary">
-                    <%= [...new Set(docs.map(d => d.category))].length %>
-                </div>
+            <div class="card card-black p-6 rounded-xl">
+                <div class="text-lg">Categories</div>
+                <div class="text-4xl font-bold neon"><%= categories %></div>
             </div>
 
-            <div class="stat bg-base-100 shadow-lg rounded-xl">
-                <div class="stat-title">Embeddings</div>
-                <div class="stat-value text-accent">Active</div>
+            <div class="card card-black p-6 rounded-xl">
+                <div class="text-lg">Embeddings</div>
+                <div class="text-4xl font-bold text-green-400">Active</div>
             </div>
 
-            <div class="stat bg-base-100 shadow-lg rounded-xl">
-                <div class="stat-title">Bot Status</div>
-                <div id="bot-status" class="stat-value text-success">Online</div>
+            <div class="card card-black p-6 rounded-xl">
+                <div class="text-lg">Bot Status</div>
+                <div id="bot-status" class="text-4xl font-bold text-green-400">Online</div>
             </div>
         </div>
 
-        <!-- Search + Add -->
-        <div class="flex flex-col md:flex-row gap-4 mb-6">
-            <input id="search" type="text" placeholder="Search knowledge base..."
-                   class="input input-bordered w-full" onkeyup="searchKB()">
-            <a href="/admin-ui/new" class="btn btn-success">➕ Add New KB</a>
+
+        <!-- Tools -->
+        <div class="flex items-center justify-between mb-4">
+            <input id="search" onkeyup="searchKB()"
+                   placeholder="Search..."
+                   class="input input-bordered w-1/3 bg-black border-gray-700"/>
+
+            <div class="flex items-center gap-3">
+                <button id="deleteSelected" class="btn btn-error btn-sm hidden" onclick="deleteSelectedKB()">
+                    Delete Selected
+                </button>
+
+                <a href="/admin/new" class="btn btn-success btn-sm">Add New KB</a>
+            </div>
         </div>
+
 
         <!-- Table -->
-        <div class="bg-base-100 rounded-xl shadow-xl overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="table table-zebra w-full">
-                    <thead>
-                        <tr>
-                            <th>#</th>
-                            <th>Title</th>
-                            <th>Category</th>
-                            <th>Preview</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
+        <div class="overflow-x-auto rounded-xl">
+            <table class="table w-full text-gray-300">
+                <thead class="bg-black border-b border-gray-800">
+                    <tr>
+                        <th><input type="checkbox" id="selectAll" onclick="toggleAll(this)" /></th>
+                        <th>#</th>
+                        <th>Title</th>
+                        <th>Category</th>
+                        <th>Preview</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
 
-                    <tbody id="kbTable">
+                <tbody id="kbTable">
                     <% docs.forEach((d, i) => { %>
-                        <tr class="kb-row hover">
-                            <td><%= i + 1 %></td>
-                            <td><%= d.title %></td>
-                            <td><span class="badge badge-primary"><%= d.category %></span></td>
-                            <td class="truncate max-w-xs"><%= d.content.substring(0, 80) %>...</td>
-                            <td>
-                                <div class="flex gap-2">
-                                    <a href="/admin-ui/edit/<%= d._id %>"
-                                       class="btn btn-info btn-xs">Edit</a>
+                    <tr class="hover:bg-gray-900">
+                        <td>
+                            <input type="checkbox" class="selectItem" value="<%= d._id %>" onclick="toggleDeleteButton()"/>
+                        </td>
+                        <td><%= i + 1 %></td>
 
-                                    <a href="/admin-ui/delete/<%= d._id %>"
-                                       onclick="return confirm('Delete this KB?')"
-                                       class="btn btn-error btn-xs">Delete</a>
-                                </div>
-                            </td>
-                        </tr>
+                        <td class="font-semibold text-white"><%= d.title %></td>
+
+                        <td>
+                            <span class="badge badge-info"><%= d.category %></span>
+                        </td>
+
+                        <td class="max-w-xs truncate text-gray-400">
+                            <%= d.content.substring(0, 90) %>...
+                        </td>
+
+                        <td>
+                            <a href="/admin/edit/<%= d._id %>" class="btn btn-info btn-xs">Edit</a>
+                            <a href="/admin/delete/<%= d._id %>" class="btn btn-error btn-xs"
+                               onclick="return confirm('Delete this KB?')">Delete</a>
+                        </td>
+                    </tr>
                     <% }) %>
-                    </tbody>
-                </table>
-            </div>
+                </tbody>
+            </table>
         </div>
 
     </div>
 
 <script>
-    function searchKB() {
-        const q = document.getElementById("search").value.toLowerCase();
-        document.querySelectorAll(".kb-row").forEach(row => {
-            row.style.display = row.textContent.toLowerCase().includes(q) ? "" : "none";
-        });
-    }
 
-    async function refreshEmbeddings() {
-        if (!confirm("Refresh all embeddings?")) return;
-        const res = await fetch("/admin/refresh-embeddings", { method: "POST" });
-        const data = await res.json();
-        alert(data.message);
-    }
+function toggleAll(src) {
+    const items = document.querySelectorAll('.selectItem');
+    items.forEach(i => i.checked = src.checked);
+    toggleDeleteButton();
+}
+
+function toggleDeleteButton() {
+    const selected = document.querySelectorAll('.selectItem:checked').length;
+    const btn = document.getElementById('deleteSelected');
+    btn.classList.toggle("hidden", selected === 0);
+}
+
+async function deleteSelectedKB() {
+    if (!confirm("Delete selected KBs?")) return;
+
+    const ids = [...document.querySelectorAll('.selectItem:checked')].map(x=>x.value);
+
+    const res = await fetch('/admin/delete-multiple', {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids })
+    });
+
+    location.reload();
+}
+
 </script>
 
 </body>
