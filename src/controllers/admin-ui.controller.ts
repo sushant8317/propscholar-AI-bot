@@ -1,7 +1,7 @@
 // src/controllers/admin-ui.controller.ts
 
 import { Router } from "express";
-import KnowledgeModel from "../models/knowledge.model";
+import { KnowledgeModel } from "../models/knowledge.model";   // FIXED ✔
 
 export const router = Router();
 
@@ -21,7 +21,7 @@ router.get("/new", (req, res) => {
   res.render("admin/new");
 });
 
-// CREATE NEW KB
+// CREATE KB
 router.post("/new", async (req, res) => {
   try {
     await KnowledgeModel.create(req.body);
