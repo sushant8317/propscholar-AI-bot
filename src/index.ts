@@ -23,12 +23,14 @@ import { RAGService } from "./services/rag.service";
 import { ToxicDetectorService } from "./services/toxicDetector.service";
 import { PolicyInspectorService } from "./services/policyInspector.service";
 import { ScholarisService } from "./services/scholaris.service";
+import { MemoryService } from "./services/memory.service";
 
 // instantiate services
 const rag = new RAGService();
 const toxic = new ToxicDetectorService();
 const inspector = new PolicyInspectorService();
 const scholaris = new ScholarisService();
+const memory = new MemoryService();
 
 // ---------------------------
 // EXPRESS APP
@@ -155,6 +157,9 @@ Give final safe PropScholar answer.
 
     const answer = await askGroq(finalPrompt);
     await msg.reply(answer);
+  // Save to memory
+        await memory.addMessage(userId, `User: ${userQuery}`);
+        await memory.addMessage(userId, `Bot: ${answer}`);
 
   } catch (err) {
     console.error("🔥 FULL BOT ERROR:", err);
