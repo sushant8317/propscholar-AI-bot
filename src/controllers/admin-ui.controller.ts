@@ -14,7 +14,7 @@ router.get("/", async (req, res) => {
       docs,
       total: docs.length,
       categories: [...new Set(docs.map(d => d.category))]
-    }
+    });
   } catch (err) {
     console.error("Admin UI load error:", err);
     res.status(500).send("Internal Server Error");
