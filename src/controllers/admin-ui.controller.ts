@@ -152,7 +152,7 @@ router.get("/bot-status", async (req, res) => {
   res.json({ isOnline: true });
 });
 
-                                              /* ------------------------------
+/* ------------------------------
    CHAT TRAINING PAGE
 ------------------------------ */
 router.get("/chat", (req, res) => {
@@ -233,7 +233,7 @@ router.post("/feedback", async (req, res) => {
         { conversationId },
         { 
           appliedToKB: true, 
-          kbEntryId: newKB._id as any.toString(),
+          kbEntryId: (newKB._id as any).toString(),
           status: "applied"
         }
       );
@@ -251,3 +251,5 @@ router.post("/feedback", async (req, res) => {
     res.status(500).json({ success: false, error: "Failed to save feedback" });
   }
 });
+
+export default router;
