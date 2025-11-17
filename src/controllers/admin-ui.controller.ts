@@ -1,6 +1,10 @@
 import { Router } from "express";
 import { KnowledgeModel } from "../models/knowledge.model";
 import { EmbedText } from "../services/embedding.service";
+import { TrainingFeedbackModel } from "../models/trainingFeedback.model";
+import { ConversationModel } from "../models/conversation.model";
+import { RAGService } from "../services/rag.service";
+import { randomBytes } from "crypto";
 
 export const router = Router();
 
@@ -146,4 +150,104 @@ router.post("/refresh-embeddings", async (req, res) => {
 ------------------------------ */
 router.get("/bot-status", async (req, res) => {
   res.json({ isOnline: true });
+});
+
+                                              /* ------------------------------
+   CHAT TRAINING PAGE
+------------------------------ */
+router.get("/chat", (req, res) => {
+  res.render("admin/chat");
+});
+
+/* ------------------------------
+   CHAT ENDPOINT (Send Message)
+------------------------------ */
+router.post("/chat", async (req, res) => {
+  try {
+    const { message, sessionId } = req.body;
+    
+    if (!message) {
+      return res.json({ success: false, error: "Message required" });
+    }
+    
+    const conversationId = randomBytes(16).toString("hex");
+    const rag = new RAGService();
+    const result = await rag.generateResponse(sessionId || "admin", message);
+    
+    await ConversationModel.create({
+      userId: sessionId || "admin",
+      conversationId,
+      userMessage: message,
+      botResponse: result.answer,
+      timestamp: new Date(),
+      confidence: result.confidence || 0,
+    });
+    
+    res.json({
+      success: true,
+      answer: result.answer,
+      conversationId,
+      confidence: result.confidence || 0,
+    });
+  } catch (err) {
+    console.error("Chat error:", err);
+    res.status(500).json({ success: false, error: "Chat failed" });
+  }
+});
+
+/* ------------------------------
+   FEEDBACK ENDPOINT (Mark Correct/Wrong)
+------------------------------ */
+router.post("/feedback", async (req, res) => {
+  try {
+    const { conversationId, isCorrect, correction } = req.body;
+    
+    const conv = await ConversationModel.findOne({ conversationId });
+    
+    if (!conv) {
+      return res.json({ success: false, error: "Conversation not found" });
+    }
+    
+    await TrainingFeedbackModel.create({
+      conversationId,
+      timestamp: new Date(),
+      userQuestion: conv.userMessage,
+      botAnswer: conv.botResponse,
+      wasCorrect: isCorrect,
+      userCorrection: correction || null,
+      status: "pending",
+      appliedToKB: false,
+    });
+    
+    if (!isCorrect && correction) {
+      const embedding = await EmbedText(correction);
+      
+      const newKB = await KnowledgeModel.create({
+        title: `Q: ${conv.userMessage}`,
+        content: `A: ${correction}`,
+        category: "Admin Corrections",
+        embedding,
+      });
+      
+      await TrainingFeedbackModel.updateOne(
+        { conversationId },
+        { 
+          appliedToKB: true, 
+          kbEntryId: newKB._id.toString(),
+          status: "applied"
+        }
+      );
+      
+      res.json({ 
+        success: true, 
+        message: "Correction added to KB",
+        kbEntryId: newKB._id 
+      });
+    } else {
+      res.json({ success: true, message: "Feedback saved" });
+    }
+  } catch (err) {
+    console.error("Feedback error:", err);
+    res.status(500).json({ success: false, error: "Failed to save feedback" });
+  }
 });
