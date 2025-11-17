@@ -10,7 +10,11 @@ export const router = Router();
 router.get("/", async (req, res) => {
   try {
     const docs = await KnowledgeModel.find().lean();
-    res.render("admin/index", { docs });
+    res.render("admin/index",{ 
+      docs,
+      total: docs.length,
+      categories: [...new Set(docs.map(d => d.category))]
+    }
   } catch (err) {
     console.error("Admin UI load error:", err);
     res.status(500).send("Internal Server Error");
