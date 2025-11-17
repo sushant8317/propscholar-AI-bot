@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Train Bot - PropScholar Admin</title>
+  <title>Advanced Bot Training - PropScholar Admin</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.24/dist/full.min.css" rel="stylesheet"/>
   <style>
@@ -18,29 +18,44 @@
     .message-user .message-content { background: #0EA5E9; color: white; }
     .message-bot .message-content { background: #1E293B; color: #E2E8F0; border: 1px solid #334155; }
     .input-area { padding: 20px; background: #111827; border-top: 1px solid #1F2937; display: flex; gap: 12px; }
-    .correction-btns { display: flex; gap: 8px; margin-top: 8px; }
-    .correction-btns button { font-size: 12px; padding: 4px 12px; border-radius: 6px; cursor: pointer; border: none; }
+    .training-mode-indicator { font-size: 12px; padding: 4px 8px; border-radius: 4px; background: #10B981; color: white; margin-left: auto; }
+    .feedback-panel { max-width: 70%; padding: 12px 16px; border-radius: 12px; background: #1E293B; border: 1px solid #475569; margin-top: 8px; }
+    .feedback-action-btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; margin-right: 8px; margin-top: 8px; }
     .btn-correct { background: #10B981; color: white; }
+    .btn-correct:hover { background: #059669; }
     .btn-wrong { background: #EF4444; color: white; }
+    .btn-wrong:hover { background: #DC2626; }
+    .confidence-badge { font-size: 11px; color: #64748B; padding: 2px 6px; border-radius: 4px; background: #0F172A; display: inline-block; margin-right: 6px; }
     .loading { display: none; }
     .loading.active { display: inline-block; }
+    .mode-indicator { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #10B981; font-weight: 600; }
   </style>
 </head>
 <body>
-  
   <div class="chat-container">
     <div style="padding: 16px 20px; background: #111827; border-bottom: 1px solid #1F2937; display: flex; align-items: center; justify-content: space-between;">
-      <div>
-        <h2 style="color: #60A5FA; font-size: 20px; font-weight: 600; margin: 0;">🤖 Train PropScholar Bot</h2>
-        <p style="color: #9CA3AF; font-size: 14px; margin: 4px 0 0 0;">Chat, correct mistakes, auto-add to KB</p>
+      <div style="flex: 1;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <h2 style="color: #60A5FA; font-size: 20px; font-weight: 600; margin: 0;">🎓 Advanced Bot Training</h2>
+          <div class="mode-indicator">
+            <span style="width: 8px; height: 8px; background: #10B981; border-radius: 50%; display: inline-block;"></span>
+            Learning Mode Active
+          </div>
+        </div>
+        <p style="color: #9CA3AF; font-size: 13px; margin: 6px 0 0 0; line-height: 1.5;">
+          💡 Chat naturally, correct wrong answers → Auto-trains Knowledge Base | Bot learns from your feedback
+        </p>
       </div>
-      <a href="/admin-ui" style="color: #60A5FA; text-decoration: none; font-size: 14px;">← Back to Dashboard</a>
+      <a href="/admin-ui" style="color: #60A5FA; text-decoration: none; font-size: 14px; white-space: nowrap;">← Dashboard</a>
     </div>
 
     <div class="messages-area" id="messagesArea">
-      <div style="text-align: center; color: #6B7280; margin-top: 40px;">
-        <p style="font-size: 16px;">💬 Start chatting with the bot</p>
-        <p style="font-size: 14px; margin-top: 8px;">Mark wrong answers to train the knowledge base</p>
+      <div style="text-align: center; color: #6B7280;">
+        <p style="font-size: 16px; font-weight: 500; margin: 40px 0 0 0;">👋 Welcome to Bot Training!</p>
+        <p style="font-size: 13px; color: #9CA3AF; margin: 12px 0 0 0; line-height: 1.6;">
+          Ask questions like you would in Discord • I'll give you answers • Mark them ✓ Correct or ✗ Wrong<br>
+          <span style="color: #64748B; font-size: 12px;">When you mark wrong, I learn & add the correct answer to my knowledge</span>
+        </p>
       </div>
     </div>
 
@@ -48,7 +63,7 @@
       <input 
         type="text" 
         id="userInput" 
-        placeholder="Ask the bot anything..." 
+        placeholder="Ask me anything... (like you would on Discord)" 
         class="input input-bordered w-full bg-[#1E293B] border-gray-600 text-white"
         onkeypress="if(event.key==='Enter') sendMessage()"
       />
@@ -61,29 +76,39 @@
 
   <script>
     let sessionId = 'admin-' + Date.now();
+    let conversationHistory = [];
+    let lastConversationId = null;
 
     function addUserMessage(text) {
       const messagesArea = document.getElementById('messagesArea');
       const msgDiv = document.createElement('div');
       msgDiv.className = 'message message-user';
-      msgDiv.innerHTML = `<div class="message-content">${escapeHtml(text)}</div>`;
+      msgDiv.innerHTML = `<div class="message-content">You: ${escapeHtml(text)}</div>`;
       messagesArea.appendChild(msgDiv);
       scrollToBottom();
     }
 
     function addBotMessage(text, conversationId, confidence) {
       const messagesArea = document.getElementById('messagesArea');
+      lastConversationId = conversationId;
       const msgDiv = document.createElement('div');
       msgDiv.className = 'message message-bot';
+      msgDiv.id = `msg-${conversationId}`;
+      
+      const confClass = confidence >= 0.8 ? 'badge-success' : confidence >= 0.6 ? 'badge-warning' : 'badge-error';
+      const confText = confidence >= 0.8 ? 'High' : confidence >= 0.6 ? 'Medium' : 'Low';
+      
       msgDiv.innerHTML = `
         <div class="message-content">
-          <div>${escapeHtml(text)}</div>
-          <div style="font-size: 11px; color: #64748B; margin-top: 8px;">
-            Confidence: ${(confidence * 100).toFixed(1)}%
+          <div style="font-weight: 500; color: #60A5FA;">Bot:</div>
+          <div style="margin-top: 8px;">${escapeHtml(text)}</div>
+          <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px;">
+            <span class="confidence-badge">📊 ${confText}: ${(confidence * 100).toFixed(0)}%</span>
+            <span style="font-size: 11px; color: #64748B;">ID: ${conversationId.substring(0, 8)}</span>
           </div>
-          <div class="correction-btns">
-            <button class="btn-correct" onclick="markCorrect('${conversationId}')">✓ Correct</button>
-            <button class="btn-wrong" onclick="markWrong('${conversationId}')">✗ Wrong - Fix It</button>
+          <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="feedback-action-btn btn-correct" onclick="markCorrect('${conversationId}')">✓ Correct</button>
+            <button class="feedback-action-btn btn-wrong" onclick="markWrong('${conversationId}')">✗ Wrong - Show Me</button>
           </div>
         </div>
       `;
@@ -112,12 +137,13 @@
         
         if (data.success) {
           addBotMessage(data.answer, data.conversationId, data.confidence || 0);
+          conversationHistory.push({ id: data.conversationId, q: message, a: data.answer, conf: data.confidence });
         } else {
-          addBotMessage('❌ Error: ' + (data.error || 'Unknown error'), '', 0);
+          addBotMessage('❌ Error: ' + (data.error || 'Failed to get response. Please try again.'), '', 0);
         }
       } catch (err) {
         console.error(err);
-        addBotMessage('❌ Connection error. Try again.', '', 0);
+        addBotMessage('❌ Connection error. Make sure the bot server is running.', '', 0);
       } finally {
         showLoading(false);
       }
@@ -125,21 +151,27 @@
 
     async function markCorrect(conversationId) {
       try {
-        await fetch('/admin-ui/feedback', {
+        const res = await fetch('/admin-ui/feedback', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ conversationId, isCorrect: true })
         });
-        alert('✅ Marked as correct!');
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          showFeedbackMessage(conversationId, '✅ Marked Correct - Thanks for confirming!', 'success');
+        }
       } catch (err) {
-        alert('Error saving feedback');
+        showFeedbackMessage(conversationId, '❌ Error saving feedback', 'error');
       }
     }
 
     async function markWrong(conversationId) {
-      const correction = prompt('What is the CORRECT answer?');
+      const correction = prompt('✏️ What is the CORRECT answer?\n\n(Share the right answer so I can learn)');
       if (!correction || !correction.trim()) return;
       
+      showLoading(true);
       try {
         const res = await fetch('/admin-ui/feedback', {
           method: 'POST',
@@ -154,12 +186,44 @@
         const data = await res.json();
         
         if (data.success) {
-          alert('✅ Correction saved and added to Knowledge Base!');
+          showFeedbackMessage(conversationId, '✅ Learned! Correction saved to my Knowledge Base', 'success');
         } else {
-          alert('Error: ' + (data.error || 'Failed to save'));
+          showFeedbackMessage(conversationId, '❌ ' + (data.error || 'Failed to save'), 'error');
         }
       } catch (err) {
-        alert('Error saving correction');
+        showFeedbackMessage(conversationId, '❌ Error saving correction', 'error');
+      } finally {
+        showLoading(false);
+      }
+    }
+
+    function showFeedbackMessage(conversationId, message, type) {
+      const msgElement = document.getElementById(`msg-${conversationId}`);
+      if (msgElement) {
+        const feedbackDiv = document.createElement('div');
+        feedbackDiv.style.marginTop = '12px';
+        feedbackDiv.style.padding = '10px 12px';
+        feedbackDiv.style.borderRadius = '6px';
+        feedbackDiv.style.fontSize = '12px';
+        feedbackDiv.style.fontWeight = '500';
+        
+        if (type === 'success') {
+          feedbackDiv.style.background = '#064E3B';
+          feedbackDiv.style.color = '#86EFAC';
+          feedbackDiv.style.borderLeft = '3px solid #10B981';
+        } else {
+          feedbackDiv.style.background = '#7F1D1D';
+          feedbackDiv.style.color = '#FCA5A5';
+          feedbackDiv.style.borderLeft = '3px solid #EF4444';
+        }
+        
+        feedbackDiv.textContent = message;
+        const content = msgElement.querySelector('.message-content');
+        content.appendChild(feedbackDiv);
+        
+        // Disable buttons after feedback
+        const buttons = msgElement.querySelectorAll('.feedback-action-btn');
+        buttons.forEach(btn => btn.disabled = true);
       }
     }
 
@@ -178,7 +242,11 @@
       div.textContent = text;
       return div.innerHTML;
     }
-  </script>
 
+    // Focus input on load
+    window.addEventListener('load', () => {
+      document.getElementById('userInput').focus();
+    });
+  </script>
 </body>
 </html>
