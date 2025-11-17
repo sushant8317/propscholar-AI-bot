@@ -2,7 +2,7 @@ import { Router } from "express";
 import { KnowledgeModel } from "../models/knowledge.model";
 import { EmbedText } from "../services/embedding.service";
 import { TrainingFeedbackModel } from "../models/trainingFeedback.model";
-import { ConversationModel } from "../models/conversation.model";
+import { Conversation } from "../models/conversation.model";
 import { RAGService } from "../services/rag.service";
 import { randomBytes } from "crypto";
 
@@ -174,7 +174,7 @@ router.post("/chat", async (req, res) => {
     const rag = new RAGService();
     const result = await rag.generateResponse(sessionId || "admin", message);
     
-    await ConversationModel.create({
+    await Conversation.create({
       userId: sessionId || "admin",
       conversationId,
       userMessage: message,
@@ -202,7 +202,7 @@ router.post("/feedback", async (req, res) => {
   try {
     const { conversationId, isCorrect, correction } = req.body;
     
-    const conv = await ConversationModel.findOne({ conversationId });
+    const conv = await Conversation.findOne({ conversationId });
     
     if (!conv) {
       return res.json({ success: false, error: "Conversation not found" });
@@ -233,7 +233,7 @@ router.post("/feedback", async (req, res) => {
         { conversationId },
         { 
           appliedToKB: true, 
-          kbEntryId: newKB._id.toString(),
+          kbEntryId: newKB._id as any.toString(),
           status: "applied"
         }
       );
