@@ -208,16 +208,19 @@ router.post("/feedback", async (req, res) => {
       return res.json({ success: false, error: "Conversation not found" });
     }
     
-    await TrainingFeedbackModel.create({
-      conversationId,
-      timestamp: new Date(),
-      userQuestion: conv.userMessage,
-      botAnswer: conv.botResponse,
-      wasCorrect: isCorrect,
-      userCorrection: correction || null,
-      status: "pending",
-      appliedToKB: false,
-    });
+await TrainingFeedbackModel.findOneAndUpdate(
+            { conversationId },
+            { $set: {
+              timestamp: new Date(),
+              userQuestion: conv.userMessage,
+              botAnswer: conv.botResponse,
+              wasCorrect: isCorrect,
+              userCorrection: correction || null,
+              status: "pending",
+              appliedToKB: false,
+            }},
+            { upsert: true }
+          );
     
     if (!isCorrect && correction) {
       const embedding = await EmbedText(correction);
