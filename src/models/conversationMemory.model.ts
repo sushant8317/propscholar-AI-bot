@@ -20,9 +20,9 @@ export class ConversationMemoryService {
 
     conv.messages.push(message);
 
-    // Keep only last 10 messages
-    if (conv.messages.length > 10) {
-      conv.messages = conv.messages.slice(-10);
+    // Keep only last 3 messages
+    if (conv.messages.length > 3) {
+      conv.messages = conv.messages.slice(-3);
     }
 
     return conv.save();
