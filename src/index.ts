@@ -1,12 +1,13 @@
 // src/index.ts
+
 import express from "express";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 import { Client, GatewayIntentBits } from "discord.js";
 import bodyParser from "body-parser";
 import basicAuth from "express-basic-auth";
-import axios from "axios";
 import path from "path";
+import OpenAI from "openai";
 
 dotenv.config();
 
@@ -24,12 +25,21 @@ import { ToxicDetectorService } from "./services/toxicDetector.service";
 import { PolicyInspectorService } from "./services/policyInspector.service";
 import { ScholarisService } from "./services/scholaris.service";
 import { MemoryService } from "./services/memory.service";
+import { TopicService } from "./services/topic.service";
 
 const rag = new RAGService();
 const toxic = new ToxicDetectorService();
 const inspector = new PolicyInspectorService();
 const scholaris = new ScholarisService();
 const memory = new MemoryService();
+const topics = new TopicService();
+
+// ---------------------------
+// OPENAI CLIENT (FINAL LLM)
+// ---------------------------
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY || process.env.OPEN_AI_FINAL_KEY,
+});
 
 // ---------------------------
 // EXPRESS APP
@@ -41,7 +51,7 @@ app.use(express.urlencoded({ extended: true }));
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
 
-// Protect /admin
+// Protect ONLY /admin routes
 app.use(
   "/admin",
   basicAuth({
@@ -54,7 +64,7 @@ app.use("/admin", adminRouter);
 app.use("/admin-ui", adminUIRouter);
 
 // ---------------------------
-// MONGO
+// MONGODB
 // ---------------------------
 mongoose
   .connect(process.env.MONGODB_URI!)
@@ -62,40 +72,33 @@ mongoose
   .catch((err) => console.error("MongoDB error:", err));
 
 // ---------------------------
-// LLM CALL (GPT)
+// FINAL GPT-4.1 FUNCTION
 // ---------------------------
-async function askFinalLLM(prompt: string) {
+async function askFinalLLM(prompt: string): Promise<string> {
   try {
-    const res = await axios.post(
-      "https://api.openai.com/v1/chat/completions",
-      {
-        model: "gpt-4.1",
-        messages: [
-          {
-            role: "system",
-            content: `
-You are Scholaris AI — PropScholar's official assistant.
-- Short sentences
-- No emojis
-- NO hallucinations.
-Answer strictly from the KB and user query.
-            `,
-          },
-          { role: "user", content: prompt },
-        ],
-        max_tokens: 350,
-        temperature: 0.2,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4.1",
+      temperature: 0.4,
+      max_tokens: 350,
+      messages: [
+        {
+          role: "system",
+          content: `
+You are Scholaris AI — PropScholar's official support assistant.
+Rules:
+- Use only PropScholar KB provided in the prompt.
+- If KB is missing data, clearly say it.
+- No emojis. No hallucinations.
+- Professional, short, accurate sentences.
+          `,
         },
-      }
-    );
+        { role: "user", content: prompt },
+      ],
+    });
 
-    return res.data.choices[0].message.content.trim();
+    return completion.choices[0].message?.content || "Error generating response.";
   } catch (err: any) {
-    console.error("🔥 OPENAI LLM ERROR:", err.response?.data || err.message);
+    console.error("🔥 GPT-4.1 ERROR:", err.response?.data || err.message);
     return "Internal AI error.";
   }
 }
@@ -111,60 +114,64 @@ const client = new Client({
   ],
 });
 
-client.on("ready", () => console.log("🤖 Discord bot ready!"));
+client.on("clientReady", () => console.log("🤖 Discord bot ready!"));
 
 // ---------------------------
-// MESSAGE HANDLER
+// BOT MESSAGE HANDLER
 // ---------------------------
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
+
+  console.log("📩 USER:", msg.author.username, "→", msg.content);
 
   try {
     const userQuery = msg.content.trim();
     const userId = msg.author.id;
 
-    // 1️⃣ Update topic FIRST
-    await memory.updateTopic(userId, userQuery);
+    // 1️⃣ Topic detection
+    const detectedTopic = topics.detectTopic(userQuery);
 
-    // 2️⃣ Toxic check
+    // 2️⃣ Toxicity
     const tox = await toxic.check(userQuery);
 
-    // 3️⃣ RAG brain
-    const ragResult = await rag.generateResponse(userId, userQuery);
+    // 3️⃣ RAG retrieval
+    const ragResult = await rag.generateResponse(userId, userQuery, detectedTopic);
 
-    // 4️⃣ Policy check
+    // 4️⃣ Policy Checks
     const policies = inspector.inspect(userQuery);
 
-    // 5️⃣ Final rewrite (guardrails)
+    // 5️⃣ Safety rewrite
     const rewritten = await scholaris.regenerateWithConstraints(
       userQuery,
       [...tox, ...policies]
     );
 
-    // 6️⃣ Final LLM prompt
+    // 6️⃣ Final prompt to GPT-4.1
     const finalPrompt = `
 User Query: ${userQuery}
 Rewritten Query: ${rewritten.answer}
 
-PropScholar Knowledge Base:
+Detected Topic: ${detectedTopic}
+
+PropScholar KB Answer:
 ${ragResult.answer}
 
 Policies Triggered: ${policies.join(", ") || "none"}
 Toxic Flags: ${tox.join(", ") || "none"}
 
-Give the final PropScholar-safe answer.
-NEVER invent rules.
-`;
+Give a final clean PropScholar answer. 
+Never hallucinate. Never invent new rules.
+Use only the KB or say "no info found".
+    `;
 
-    // 7️⃣ GPT final answer
-    const finalAnswer = await askFinalLLM(finalPrompt);
+    const finalText = await askFinalLLM(finalPrompt);
 
-    // 8️⃣ Reply
-    await msg.reply(finalAnswer);
+    // 7️⃣ Reply
+    await msg.reply(finalText);
 
-    // 9️⃣ Save memory (only 3 short-term)
+    // 8️⃣ Memory
     await memory.addShortTerm(userId, `User: ${userQuery}`);
-    await memory.addShortTerm(userId, `Bot: ${finalAnswer}`);
+    await memory.addShortTerm(userId, `Bot: ${finalText}`);
 
   } catch (err) {
     console.error("🔥 FULL BOT ERROR:", err);
@@ -172,20 +179,29 @@ NEVER invent rules.
   }
 });
 
-// login bot
+// ---------------------------
+// BOT LOGIN
+// ---------------------------
 client.login(process.env.DISCORD_TOKEN);
 
-// root
+// ---------------------------
+// ROOT PAGE
+// ---------------------------
 app.get("/", (req, res) => {
   res.send("PropScholar AI Bot Running");
 });
 
-// ingest on startup
-if (process.env.INGEST_ON_STARTUP === "true") {
-  import("./scripts/ingest-data").then(() =>
-    console.log("📥 KB Ingest complete")
-  );
-}
-
+// ---------------------------
+// SERVER START
+// ---------------------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));
+
+// ---------------------------
+// OPTIONAL INGEST
+// ---------------------------
+if (process.env.INGEST_ON_STARTUP === "true") {
+  import("./scripts/ingest-data").then(() => {
+    console.log("📥 KB Ingest complete");
+  });
+}
