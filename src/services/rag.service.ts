@@ -4,6 +4,7 @@ import OpenAI from "openai";
 import { VectorService } from "./vector.service";
 import { EmbedText } from "./embedding.service";
 import { MemoryService } from "./memory.service";
+import { TopicService } from "./topic.service";
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -18,217 +19,166 @@ type KBDoc = {
 export class RAGService {
   private vector = new VectorService();
   private memory = new MemoryService();
+  private topics = new TopicService();
 
-  // ------------------------------
-  // Rule-based keyword boosting
-  // ------------------------------
-  private RULE_BOOSTS = [
-    { keyword: "daily", category: "rules", boost: 0.20 },
-    { keyword: "daily drawdown", category: "rules", boost: 0.30 },
-    { keyword: "max loss", category: "rules", boost: 0.25 },
-    { keyword: "payout", category: "payout", boost: 0.20 },
-    { keyword: "withdraw", category: "payout", boost: 0.20 },
-    { keyword: "plus", category: "plus-model", boost: 0.18 },
-    { keyword: "unfair means", category: "ufm-rules", boost: 0.25 },
-    { keyword: "tick scalping", category: "ufm-rules", boost: 0.25 }
-  ];
-
-  // Conf threshold
-  private HALLUCINATION_THRESHOLD = 0.40;
-
-  // Vector search top-K
+  private HALLUCINATION_THRESHOLD = 0.35;
   private TOP_K = 8;
 
-  // -----------------------------
-  // QUERY EXPANSION
-  // -----------------------------
   private expandQuery(q: string): string[] {
     const base = q.toLowerCase();
     const res = [base];
 
     const synonyms: Record<string, string[]> = {
-      plus: ["1-step", "2-step", "plus-model"],
-      payout: ["withdraw", "profit split", "scholarship"],
-      daily: ["daily dd", "daily drawdown", "ddl"],
-      ufm: ["unfair means", "tick scalping"]
+      plus: ["1 step", "1-step", "2 step", "plus model"],
+      daily: ["daily dd", "daily loss", "ddl", "dmax"],
+      payout: ["withdraw", "profit split"],
+      ufm: ["unfair means", "tick scalping"],
     };
 
     for (const k in synonyms) {
       if (base.includes(k)) res.push(...synonyms[k]);
     }
 
-    return [...new Set(res)];
+    return Array.from(new Set(res));
   }
 
-  // -----------------------------
-  // RERANK RESULTS
-  // -----------------------------
-  private rerank(results: KBDoc[], query: string, topic: string) {
-    const q = query.toLowerCase();
+  private rerankByTopic(docs: KBDoc[], topic: string): KBDoc[] {
+    if (!topic || topic === "general") return docs;
 
-    return results
-      .map((doc) => {
-        let boost = 0;
+    return docs.map((d) => {
+      let boost = 0;
+      const cat = d.metadata?.category || "";
 
-        const content = (doc.content || "").toLowerCase();
-        const category = doc.metadata?.category || "";
+      if (cat === topic) boost += 0.25;
 
-        // Rule boosts
-        for (const rule of this.RULE_BOOSTS) {
-          if (q.includes(rule.keyword)) {
-            if (rule.category && category === rule.category) {
-              boost += rule.boost + 0.10;
-            } else if (content.includes(rule.keyword)) {
-              boost += rule.boost;
-            }
-          }
-        }
-
-        // TOPIC BOOST
-        if (topic && category === topic) {
-          boost += 0.25; // strong match
-        }
-
-        // exact token match
-        for (const t of q.split(" ")) {
-          if (t.length > 3 && content.includes(t)) boost += 0.05;
-        }
-
-        return {
-          ...doc,
-          score: (doc.score || 0) + boost,
-        };
-      })
-      .sort((a, b) => (b.score || 0) - (a.score || 0));
+      return {
+        ...d,
+        score: (d.score || 0) + boost,
+      };
+    });
   }
 
-  // -----------------------------
-  // CONFIDENCE SCORE
-  // -----------------------------
-  private confidence(docs: KBDoc[]) {
-    if (!docs.length) return 0;
+  private computeConfidence(docs: KBDoc[]): number {
+    if (docs.length === 0) return 0;
     const max = Math.max(...docs.map((d) => d.score || 0));
-    return Math.min(1, Math.max(0, max));
+    if (max <= 0) return 0;
+    return Number(Math.min(1, max).toFixed(2));
   }
 
-  // -----------------------------
-  // TRIM KB CONTEXT
-  // -----------------------------
-  private buildContext(docs: KBDoc[], limit = 2500) {
-    let final = "";
-    for (const d of docs) {
-      const block = `${d.metadata?.title || ""}\n${d.content}\n---\n`;
-      if (final.length + block.length > limit) break;
-      final += block;
-    }
-    return final;
-  }
-
-  // -----------------------------
-  // SAFE JSON PARSER
-  // -----------------------------
-  private safeParse(text: string) {
+  private safeParseJson(text: string | null): { analysis?: string; answer?: string } | null {
+    if (!text) return null;
     try {
-      const start = text.indexOf("{");
-      if (start === -1) return null;
-      return JSON.parse(text.slice(start));
+      const trimmed = text.trim();
+      const start = trimmed.indexOf("{");
+      const jsonStr = start >= 0 ? trimmed.slice(start) : trimmed;
+      return JSON.parse(jsonStr);
     } catch {
       return null;
     }
   }
 
-  // =====================================================================
-  //                         MAIN RAG ENGINE
-  // =====================================================================
   async generateResponse(userId: string, query: string, topic: string) {
-    // 1) Memory
     const mem = await this.memory.getMemory(userId);
 
-    const short = mem.shortTerm.map((m) => m.text).join(" | ");
-    const long = mem.longTerm.map((m) => m.text).join(" | ");
+    const shortTerm =
+      mem.shortTerm?.map((m: any) => m.text).join(" | ") || "none";
 
-    // 2) Embed expanded query
+    const longTerm =
+      mem.longTerm?.map((m: any) => m.text).join(" | ") || "none";
+
     const expanded = this.expandQuery(query).join(" ");
-    const embed = await EmbedText(expanded);
+    const queryEmbedding = await EmbedText(expanded);
 
-    // 3) Vector search
-    const raw = await this.vector.findSimilar(embed, this.TOP_K, 0.2);
-    const docs: KBDoc[] = raw.map((r) => ({
-      _id: r._id,
-      content: r.content,
-      metadata: r.metadata,
-      score: r.score,
-    }));
+    const raw = await this.vector.findSimilar(queryEmbedding, this.TOP_K, 0.20);
 
-    // 4) Re-rank
-    const reranked = this.rerank(docs, query, topic);
+    const docs: KBDoc[] =
+      raw?.map((r: any) => ({
+        _id: r._id,
+        content: r.content,
+        embedding: r.embedding,
+        metadata: r.metadata,
+        score: r.score,
+      })) || [];
 
-    // 5) Confidence
-    const confidence = this.confidence(reranked);
+    const ranked = this.rerankByTopic(docs, topic);
+    const confidence = this.computeConfidence(ranked);
 
-    // 6) Hallucination check
-    if (!reranked.length || confidence < this.HALLUCINATION_THRESHOLD) {
+    if (ranked.length === 0 || confidence < this.HALLUCINATION_THRESHOLD) {
       await this.memory.addShortTerm(userId, `User: ${query}`);
       return {
-        answer: "I do not have this information yet in the PropScholar knowledge base.",
+        answer:
+          "I cannot find this in PropScholar’s knowledge base yet.",
         confidence,
-        usedDocs: []
+        usedDocs: [],
       };
     }
 
-    // 7) Build KB context
-    const kbContext = this.buildContext(reranked);
+    const kbContext = ranked
+      .slice(0, 5)
+      .map((d) => `${d.metadata?.title || ""}\n${d.content}\n---\n`)
+      .join("\n")
+      .slice(0, 2500);
 
-    // 8) System instructions
     const systemPrompt = `
-You are PropScholar AI. 
-Use ONLY the KB context. No hallucinations.
-Return JSON: { "analysis": "...", "answer": "..." }
-Tone: short, clean, professional.
-    `;
+You are PropScholar AI.
+Use ONLY the KB context. No hallucination.
+Always output JSON:
+{
+ "analysis": "...",
+ "answer": "..."
+}
+Tone: short, clear, professional.
+`;
 
-    const userMessage = `
+    const userMsg = `
 User Query: ${query}
 
-Detected Topic: ${topic}
+Topic: ${topic}
 
-Short-term memory: ${short || "none"}
-Long-term memory: ${long || "none"}
+Short-term memory: ${shortTerm}
+Long-term memory: ${longTerm}
 
 KB Context:
 ${kbContext}
     `;
 
-    // 9) LLM call
-    let final = "";
+    let rawText: string | null = null;
+
     try {
       const completion = await client.chat.completions.create({
-        model: "gpt-4.1",
-        temperature: 0.0,
-        max_tokens: 700,
+        model: "gpt-4.1-mini",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: userMessage },
+          { role: "user", content: userMsg },
         ],
+        max_tokens: 600,
+        temperature: 0.0,
       });
 
-      const rawText = completion.choices[0].message.content;
-      const parsed = this.safeParse(rawText);
-
-      final = parsed?.answer || rawText.trim();
+      rawText = completion.choices?.[0]?.message?.content || null;
     } catch (err) {
-      console.error("RAG LLM error:", err);
-      final = "Internal AI error. Try again.";
+      console.error("RAG LLM ERROR:", err);
+      return {
+        answer: "Internal LLM error.",
+        confidence,
+        usedDocs: [],
+      };
     }
 
-    // 10) Save memory
+    const parsed = this.safeParseJson(rawText);
+
+    const finalAnswer =
+      parsed?.answer ||
+      rawText ||
+      "I cannot find this in the PropScholar knowledge base.";
+
     await this.memory.addShortTerm(userId, `User: ${query}`);
-    await this.memory.addShortTerm(userId, `Bot: ${final}`);
+    await this.memory.addShortTerm(userId, `Bot: ${finalAnswer}`);
 
     return {
-      answer: final,
+      answer: finalAnswer,
       confidence,
-      usedDocs: reranked.slice(0, 5),
+      usedDocs: ranked.slice(0, 5),
     };
   }
 }
