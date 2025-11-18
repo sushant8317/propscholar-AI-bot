@@ -25,7 +25,6 @@ import { PolicyInspectorService } from "./services/policyInspector.service";
 import { ScholarisService } from "./services/scholaris.service";
 import { MemoryService } from "./services/memory.service";
 
-// instantiate services
 const rag = new RAGService();
 const toxic = new ToxicDetectorService();
 const inspector = new PolicyInspectorService();
@@ -39,11 +38,10 @@ const app = express();
 app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Enable EJS views
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
 
-// Protect ONLY /admin routes
+// Protect /admin
 app.use(
   "/admin",
   basicAuth({
@@ -52,12 +50,11 @@ app.use(
   })
 );
 
-// Routes
 app.use("/admin", adminRouter);
 app.use("/admin-ui", adminUIRouter);
 
 // ---------------------------
-// MONGODB
+// MONGO
 // ---------------------------
 mongoose
   .connect(process.env.MONGODB_URI!)
@@ -65,39 +62,40 @@ mongoose
   .catch((err) => console.error("MongoDB error:", err));
 
 // ---------------------------
-// GROQ CALL (LLM)
+// LLM CALL (GPT)
 // ---------------------------
-async function askGroq(prompt: string): Promise<string> {
+async function askFinalLLM(prompt: string) {
   try {
     const res = await axios.post(
-      "https://api.groq.com/openai/v1/chat/completions",
+      "https://api.openai.com/v1/chat/completions",
       {
-        model: "llama-3.1-8b-instant",
+        model: "gpt-4.1",
         messages: [
           {
             role: "system",
             content: `
-You are Scholaris AI — PropScholar's official support assistant.
-Short helpful sentences. No emojis. Friendly and professional.
-Use PropScholar rules ONLY. Avoid giving trading/financial advice.
+You are Scholaris AI — PropScholar's official assistant.
+- Short sentences
+- No emojis
+- NO hallucinations.
+Answer strictly from the KB and user query.
             `,
           },
           { role: "user", content: prompt },
         ],
         max_tokens: 350,
-        temperature: 0.4,
+        temperature: 0.2,
       },
       {
         headers: {
-          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         },
       }
     );
 
     return res.data.choices[0].message.content.trim();
   } catch (err: any) {
-    console.error("🔥 GROQ ERROR:", err.response?.data || err.message);
+    console.error("🔥 OPENAI LLM ERROR:", err.response?.data || err.message);
     return "Internal AI error.";
   }
 }
@@ -113,58 +111,60 @@ const client = new Client({
   ],
 });
 
-// READY EVENT
 client.on("ready", () => console.log("🤖 Discord bot ready!"));
 
+// ---------------------------
 // MESSAGE HANDLER
+// ---------------------------
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
-
-  console.log("📩 USER:", msg.author.username, "→", msg.content);
 
   try {
     const userQuery = msg.content.trim();
     const userId = msg.author.id;
 
-    // 1️⃣ Toxicity
+    // 1️⃣ Update topic FIRST
+    await memory.updateTopic(userId, userQuery);
+
+    // 2️⃣ Toxic check
     const tox = await toxic.check(userQuery);
 
-    // 2️⃣ RAG response (from your upgraded AI brain)
+    // 3️⃣ RAG brain
     const ragResult = await rag.generateResponse(userId, userQuery);
 
-    // 3️⃣ Policy inspector
+    // 4️⃣ Policy check
     const policies = inspector.inspect(userQuery);
 
-    // 4️⃣ Guardrails rewrite (Scholaris)
+    // 5️⃣ Final rewrite (guardrails)
     const rewritten = await scholaris.regenerateWithConstraints(
       userQuery,
       [...tox, ...policies]
     );
 
-    // 5️⃣ Build FINAL AI prompt
+    // 6️⃣ Final LLM prompt
     const finalPrompt = `
 User Query: ${userQuery}
 Rewritten Query: ${rewritten.answer}
 
-PropScholar Knowledge Base says:
+PropScholar Knowledge Base:
 ${ragResult.answer}
 
 Policies Triggered: ${policies.join(", ") || "none"}
 Toxic Flags: ${tox.join(", ") || "none"}
 
-Give a final clear PropScholar answer based on the rewritten query and KB context.
-NEVER hallucinate. NEVER invent new rules.
-    `;
+Give the final PropScholar-safe answer.
+NEVER invent rules.
+`;
 
-    // 6️⃣ Ask Groq for final answer
-    const answer = await askGroq(finalPrompt);
+    // 7️⃣ GPT final answer
+    const finalAnswer = await askFinalLLM(finalPrompt);
 
-    // 7️⃣ Send reply
-    await msg.reply(answer);
+    // 8️⃣ Reply
+    await msg.reply(finalAnswer);
 
-    // 8️⃣ Save memory (new system)
+    // 9️⃣ Save memory (only 3 short-term)
     await memory.addShortTerm(userId, `User: ${userQuery}`);
-    await memory.addShortTerm(userId, `Bot: ${answer}`);
+    await memory.addShortTerm(userId, `Bot: ${finalAnswer}`);
 
   } catch (err) {
     console.error("🔥 FULL BOT ERROR:", err);
@@ -172,27 +172,20 @@ NEVER hallucinate. NEVER invent new rules.
   }
 });
 
-// LOGIN BOT
+// login bot
 client.login(process.env.DISCORD_TOKEN);
 
-// ---------------------------
-// ROOT PAGE
-// ---------------------------
+// root
 app.get("/", (req, res) => {
   res.send("PropScholar AI Bot Running");
 });
 
-// ---------------------------
-// SERVER START
-// ---------------------------
+// ingest on startup
+if (process.env.INGEST_ON_STARTUP === "true") {
+  import("./scripts/ingest-data").then(() =>
+    console.log("📥 KB Ingest complete")
+  );
+}
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));
-
-// ---------------------------
-// OPTIONAL KB INGEST
-// ---------------------------
-if (process.env.INGEST_ON_STARTUP === "true") {
-  import("./scripts/ingest-data").then(() => {
-    console.log("📥 KB Ingest complete");
-  });
-}

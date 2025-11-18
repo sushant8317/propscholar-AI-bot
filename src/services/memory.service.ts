@@ -3,10 +3,8 @@
 import MemoryModel from "../models/memory.model";
 
 export class MemoryService {
-
-  // ---------------------------
-  // Get or create memory record
-  // ---------------------------
+  
+  // Fetch or create memory record
   async getMemory(userId: string) {
     let mem = await MemoryModel.findOne({ userId });
 
@@ -15,6 +13,7 @@ export class MemoryService {
         userId,
         shortTerm: [],
         longTerm: [],
+        currentTopic: "general",
       });
     }
 
@@ -24,19 +23,12 @@ export class MemoryService {
     return mem;
   }
 
-  // ---------------------------
-  // Add to SHORT TERM memory
-  // Only keep last 3 messages
-  // ---------------------------
+  // Add short-term memory (keep 3)
   async addShortTerm(userId: string, text: string) {
     const mem = await this.getMemory(userId);
 
-    mem.shortTerm.push({
-      text,
-      createdAt: new Date(),
-    });
+    mem.shortTerm.push({ text, createdAt: new Date() });
 
-    // Keep only last 3 messages
     if (mem.shortTerm.length > 3) {
       mem.shortTerm = mem.shortTerm.slice(-3);
     }
@@ -45,19 +37,12 @@ export class MemoryService {
     await mem.save();
   }
 
-  // ---------------------------
-  // Add to LONG TERM memory
-  // Used only for confirmed facts
-  // ---------------------------
+  // Add long-term memory (keep 30)
   async addLongTerm(userId: string, text: string) {
     const mem = await this.getMemory(userId);
 
-    mem.longTerm.push({
-      text,
-      createdAt: new Date(),
-    });
+    mem.longTerm.push({ text, createdAt: new Date() });
 
-    // Keep long-term capped at 30
     if (mem.longTerm.length > 30) {
       mem.longTerm.shift();
     }
@@ -66,12 +51,18 @@ export class MemoryService {
     await mem.save();
   }
 
-  // ---------------------------
-  // Topic reset: clear short-term
-  // ---------------------------
+  // Reset short-term memory only
   async resetShortTerm(userId: string) {
     const mem = await this.getMemory(userId);
     mem.shortTerm = [];
+    mem.updatedAt = new Date();
+    await mem.save();
+  }
+
+  // ✔ ADD THIS — FIXES YOUR ERROR
+  async updateTopic(userId: string, topic: string) {
+    const mem = await this.getMemory(userId);
+    mem.currentTopic = topic;
     mem.updatedAt = new Date();
     await mem.save();
   }

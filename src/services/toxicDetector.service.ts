@@ -1,18 +1,26 @@
+// src/services/toxicDetector.service.ts
+
 export class ToxicDetectorService {
-  public rules = [
-    { keyword: "fuck", issue: "toxic-language" },
-    { keyword: "idiot", issue: "toxic-language" },
-    { keyword: "kill", issue: "violent-language" },
-  ];
+  private badWords = ["idiot", "stupid", "dumb", "fuck"]; // expand as needed
 
-  check(text: string): string[] {
+  /**
+   * Returns an array of flags/tokens detected.
+   * Keep this inexpensive to run in real-time.
+   */
+  async check(text: string): Promise<string[]> {
+    if (!text) return [];
     const lowered = text.toLowerCase();
-    const issues: string[] = [];
+    const flags: string[] = [];
 
-    for (const rule of this.rules) {
-      if (lowered.includes(rule.keyword)) issues.push(rule.issue);
+    for (const w of this.badWords) {
+      if (lowered.includes(w)) flags.push(`bad-word:${w}`);
     }
 
-    return issues;
+    // trivial length check / punctuation spam
+    const exclaim = (text.match(/!/g) || []).length;
+    if (exclaim > 5) flags.push("spam:excessive-punctuation");
+
+    // placeholder for future integration with external toxicity API
+    return flags;
   }
 }

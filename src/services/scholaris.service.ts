@@ -1,50 +1,48 @@
 // src/services/scholaris.service.ts
-import axios from "axios";
+import OpenAI from "openai";
+
+const client = new OpenAI({ apiKey: process.env.OPEN_AI_FINAL_KEY || process.env.OPENAI_API_KEY });
 
 export class ScholarisService {
-  async regenerateWithConstraints(userQuery: string, issues: string[]) {
+  /**
+   * Regenerate the user's query to be safe, remove disallowed things,
+   * return { answer: rewritten, reasons: [] }
+   */
+  async regenerateWithConstraints(query: string, triggers: string[] = []) {
     try {
-      const prompt = `
-Rewrite the user's message safely.
-Remove harmful, policy-violating, or toxic content.
-Keep meaning but follow PropScholar rules strictly.
+      const system = `
+You are a safe query rewriter for PropScholar support.
+Remove or neutralize toxic content, remove requests that ask to bypass rules, and preserve intent.
+Return JSON: { "answer": "<rewritten query>" } only.
+`;
 
-User message:
-${userQuery}
-
-Issues detected:
-${issues.join(", ") || "none"}
-
-Return improved safe version only.
-      `;
-
-      const response = await axios.post(
-        "https://api.groq.com/openai/v1/chat/completions",
-        {
-          model: "llama-3.1-8b-instant",
-          messages: [
-            { role: "system", content: "You sanitize user text." },
-            { role: "user", content: prompt },
-          ],
-          max_tokens: 120,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-            "Content-Type": "application/json",
+      const res = await client.chat.completions.create({
+        model: "gpt-4o-mini", // lightweight rewrite model; change if needed
+        messages: [
+          { role: "system", content: system },
+          {
+            role: "user",
+            content: `Rewrite this user query to be safe for a support assistant. Triggers: ${triggers.join(
+              ", "
+            )}\n\nQuery: ${query}`,
           },
-        }
-      );
+        ],
+        max_tokens: 200,
+        temperature: 0.0,
+      });
 
-      return {
-        answer: response.data.choices?.[0]?.message?.content || "",
-        confidence: 0.9,
-      };
-    } catch (err: any) {
-      return {
-        answer: "Could not regenerate safely.",
-        confidence: 0.1,
-      };
+      const raw = res.choices?.[0]?.message?.content || "";
+      try {
+        const j = JSON.parse(raw);
+        if (j && j.answer) return { answer: (j.answer as string).trim() };
+      } catch {
+        // fallback: return raw cleaned text
+        return { answer: raw.trim() };
+      }
+    } catch (err) {
+      console.error("Scholaris rewrite error:", err);
     }
+
+    return { answer: query };
   }
 }
