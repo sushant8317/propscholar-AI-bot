@@ -2,48 +2,41 @@
 
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-import { KNOWLEDGE_BASE } from "../data/kb";
-import { EmbedBatch } from "../services/embedding.service";
-import { VectorService } from "../services/vector.service";
+import { DynamicIngestService } from "../services/dynamic-ingest.service";
 
 dotenv.config();
 
-async function ingestData() {
-  try {
-    console.log("📡 Connecting to MongoDB...");
-    await mongoose.connect(process.env.MONGODB_URI!);
-    console.log("✅ MongoDB Connected");
+async function run() {
+  console.log("📡 Connecting to MongoDB...");
 
-    const vector = new VectorService();
+  await mongoose.connect(process.env.MONGODB_URI!);
+  console.log("✔ MongoDB connected");
 
-    console.log("🔥 Starting ingestion...");
-    console.log(`📚 Total KB items: ${KNOWLEDGE_BASE.length}`);
+  const ingestor = new DynamicIngestService();
 
-    const texts = KNOWLEDGE_BASE.map(k => k.content);
-    const embeddings = await EmbedBatch(texts);
+  console.log("📥 Starting KB ingestion...");
 
-    for (let i = 0; i < KNOWLEDGE_BASE.length; i++) {
-      const item = KNOWLEDGE_BASE[i];
-      const embedding = embeddings[i];
-
-      await vector.upsertEmbedding(
-        item.id,
-        item.content,
-        embedding,
-        { source: "kb" }
-      );
-
-      console.log(`✅ Saved embedding: ${item.id}`);
+  // Your KB items — replace/add more
+  const items = [
+    {
+      title: "Daily Drawdown Rule",
+      content: "Daily drawdown resets at 00:00 IST. Equity must not hit the limit.",
+      category: "rules",
+    },
+    {
+      title: "Maximum Loss Rule",
+      content: "Account cannot go below the maximum loss from initial balance.",
+      category: "rules",
     }
+  ];
 
-    console.log("🎉 Ingestion successfully completed.");
+  await ingestor.ingestItems(items);
 
-  } catch (err) {
-    console.error("❌ Ingestion error:", err);
-  } finally {
-    await mongoose.disconnect();
-    console.log("🔌 MongoDB Disconnected");
-  }
+  console.log("🎉 KB ingestion finished.");
+  process.exit(0);
 }
 
-ingestData();
+run().catch((err) => {
+  console.error("❌ Ingest script error:", err);
+  process.exit(1);
+});

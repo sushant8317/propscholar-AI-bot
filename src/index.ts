@@ -65,7 +65,7 @@ mongoose
   .catch((err) => console.error("MongoDB error:", err));
 
 // ---------------------------
-// GROQ CALL
+// GROQ CALL (LLM)
 // ---------------------------
 async function askGroq(prompt: string): Promise<string> {
   try {
@@ -77,9 +77,9 @@ async function askGroq(prompt: string): Promise<string> {
           {
             role: "system",
             content: `
-You are Scholaris AI — PropScholar's support assistant.
-Short helpful sentences. Human tone. No emojis.
-Only PropScholar rules. No forex advice.
+You are Scholaris AI — PropScholar's official support assistant.
+Short helpful sentences. No emojis. Friendly and professional.
+Use PropScholar rules ONLY. Avoid giving trading/financial advice.
             `,
           },
           { role: "user", content: prompt },
@@ -98,7 +98,7 @@ Only PropScholar rules. No forex advice.
     return res.data.choices[0].message.content.trim();
   } catch (err: any) {
     console.error("🔥 GROQ ERROR:", err.response?.data || err.message);
-    return "Internal LLM error";
+    return "Internal AI error.";
   }
 }
 
@@ -114,7 +114,7 @@ const client = new Client({
 });
 
 // READY EVENT
-client.on("clientReady", () => console.log("🤖 Discord bot ready!"));
+client.on("ready", () => console.log("🤖 Discord bot ready!"));
 
 // MESSAGE HANDLER
 client.on("messageCreate", async (msg) => {
@@ -129,41 +129,46 @@ client.on("messageCreate", async (msg) => {
     // 1️⃣ Toxicity
     const tox = await toxic.check(userQuery);
 
-    // 2️⃣ RAG
+    // 2️⃣ RAG response (from your upgraded AI brain)
     const ragResult = await rag.generateResponse(userId, userQuery);
 
     // 3️⃣ Policy inspector
     const policies = inspector.inspect(userQuery);
 
-    // 4️⃣ Guardrails rewrite
+    // 4️⃣ Guardrails rewrite (Scholaris)
     const rewritten = await scholaris.regenerateWithConstraints(
       userQuery,
       [...tox, ...policies]
     );
 
+    // 5️⃣ Build FINAL AI prompt
     const finalPrompt = `
 User Query: ${userQuery}
-Rewritten: ${rewritten.answer}
+Rewritten Query: ${rewritten.answer}
 
-Memory: ${ragResult.memory}
-Knowledge: ${ragResult.answer}
+PropScholar Knowledge Base says:
+${ragResult.answer}
 
-Behaviour: ${ragResult.behaviour}
-Policies: ${policies.join(", ") || "none"}
+Policies Triggered: ${policies.join(", ") || "none"}
 Toxic Flags: ${tox.join(", ") || "none"}
 
-Give final safe PropScholar answer.
+Give a final clear PropScholar answer based on the rewritten query and KB context.
+NEVER hallucinate. NEVER invent new rules.
     `;
 
+    // 6️⃣ Ask Groq for final answer
     const answer = await askGroq(finalPrompt);
+
+    // 7️⃣ Send reply
     await msg.reply(answer);
-  // Save to memory
-        await memory.addMessage(userId, `User: ${userQuery}`);
-        await memory.addMessage(userId, `Bot: ${answer}`);
+
+    // 8️⃣ Save memory (new system)
+    await memory.addShortTerm(userId, `User: ${userQuery}`);
+    await memory.addShortTerm(userId, `Bot: ${answer}`);
 
   } catch (err) {
     console.error("🔥 FULL BOT ERROR:", err);
-    msg.reply("Internal error. Check server logs.");
+    msg.reply("Internal AI error. Please try again later.");
   }
 });
 
@@ -184,10 +189,10 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));
 
 // ---------------------------
-// OPTIONAL INGEST
+// OPTIONAL KB INGEST
 // ---------------------------
 if (process.env.INGEST_ON_STARTUP === "true") {
   import("./scripts/ingest-data").then(() => {
-    console.log("📥 Ingest complete");
+    console.log("📥 KB Ingest complete");
   });
 }

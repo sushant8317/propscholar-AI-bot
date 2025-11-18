@@ -1,0 +1,170 @@
+<!-- views/admin_chat.ejs -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <title><%= title || "Admin Chat" %></title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.24/dist/full.min.css" rel="stylesheet">
+  <style>
+    body { background: #071022; color: #e6eef7; }
+    .chat-window { height: 60vh; overflow: auto; padding: 1rem; }
+    .bubble { max-width: 75%; padding: 0.75rem 1rem; border-radius: 12px; margin: 6px 0; display: inline-block; }
+    .me { background: linear-gradient(90deg,#0ea5e9,#7c3aed); color: white; border-radius: 12px 12px 0 12px; }
+    .bot { background: rgba(255,255,255,0.06); color: #e6eef7; border-radius: 12px 12px 12px 0; }
+    .source-card { background: rgba(255,255,255,0.03); padding: 0.6rem; border-radius: 8px; margin-top: 6px; font-size: 13px;}
+  </style>
+</head>
+<body class="p-6">
+
+  <div class="max-w-4xl mx-auto bg-[#0b1220] rounded-xl shadow-lg">
+    <div class="p-4 border-b border-white/5 flex items-center">
+      <h2 class="text-xl font-semibold">Admin Trainer Chat</h2>
+      <div class="ml-auto">
+        <button onclick="location.reload()" class="btn btn-ghost btn-sm">Refresh</button>
+      </div>
+    </div>
+
+    <div id="chat" class="chat-window p-4">
+      <!-- messages appended here -->
+    </div>
+
+    <div class="p-4 border-t border-white/5">
+      <form id="chatForm" onsubmit="return sendMessage();">
+        <div class="flex gap-2">
+          <input id="question" placeholder="Ask the bot..." class="input input-bordered flex-1" />
+          <button class="btn btn-primary" type="submit">Send</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Correction Modal (simple) -->
+  <div id="correctionModal" style="display:none; position:fixed; inset:0; align-items:center; justify-content:center;">
+    <div style="background:#071022; padding:16px; border-radius:8px; width:720px; margin:auto; box-shadow:0 6px 30px rgba(0,0,0,0.6);">
+      <h3 class="text-lg">Submit Correction</h3>
+      <p id="corrQuestion" class="text-sm opacity-70"></p>
+      <textarea id="correctionText" rows="4" class="textarea textarea-bordered w-full mt-2" placeholder="Write corrected answer here"></textarea>
+      <div class="mt-3 flex justify-end gap-2">
+        <button onclick="closeCorrection()" class="btn btn-ghost">Cancel</button>
+        <button onclick="submitCorrection()" class="btn btn-success">Save Correction</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+let lastQ = null;
+let lastBotA = null;
+let lastSources = [];
+
+function appendMessage(who, text, meta = {}) {
+  const chat = document.getElementById('chat');
+  const wrap = document.createElement('div');
+  wrap.className = who === 'me' ? 'me bubble float-right' : 'bot bubble float-left';
+  wrap.innerHTML = `<div>${text.replace(/\n/g,'<br/>')}</div>`;
+  // add a small actions row for bot replies
+  if (who === 'bot') {
+    const actions = document.createElement('div');
+    actions.style.marginTop = '8px';
+    actions.innerHTML = `<button class="btn btn-xs btn-ghost" onclick="openCorrection()">Wrong answer</button>
+                         <button class="btn btn-xs btn-ghost" onclick="copyAnswer(this)">Copy</button>`;
+    wrap.appendChild(actions);
+    if (meta.sources && meta.sources.length) {
+      meta.sources.forEach(s => {
+        const sc = document.createElement('div');
+        sc.className = 'source-card';
+        sc.innerHTML = `<strong>${s.metadata?.title || s.metadata?.source || 'Source'}</strong>
+                        <div class="text-xs opacity-70">score ${ (s.score||0).toFixed(3) }</div>
+                        <div class="text-sm mt-1">${(s.metadata.text||s.metadata.content||'').substring(0,250)}</div>`;
+        wrap.appendChild(sc);
+      });
+    }
+  }
+  chat.appendChild(wrap);
+  // auto scroll
+  chat.scrollTop = chat.scrollHeight;
+}
+
+async function sendMessage() {
+  const qEl = document.getElementById('question');
+  const question = qEl.value.trim();
+  if (!question) return false;
+  appendMessage('me', question);
+  qEl.value = '';
+  // show typing placeholder
+  appendMessage('bot', '...thinking');
+
+  try {
+    const resp = await fetch('/api/admin/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question, topK: 4 })
+    });
+    const data = await resp.json();
+    // remove the last placeholder
+    const chat = document.getElementById('chat');
+    chat.lastChild.remove();
+
+    if (!data.ok) {
+      appendMessage('bot', 'Error: ' + (data.error || 'unknown'));
+      return false;
+    }
+
+    lastQ = question;
+    lastBotA = data.answer;
+    lastSources = data.sources || [];
+
+    appendMessage('bot', data.answer, { sources: data.sources || [] });
+  } catch (err) {
+    console.error(err);
+    const chat = document.getElementById('chat');
+    chat.lastChild.remove();
+    appendMessage('bot', 'Network error');
+  }
+  return false;
+}
+
+function openCorrection() {
+  if (!lastQ || !lastBotA) return alert('No bot answer to correct');
+  document.getElementById('corrQuestion').innerText = `Q: ${lastQ}\nBot: ${lastBotA}`;
+  document.getElementById('correctionText').value = '';
+  document.getElementById('correctionModal').style.display = 'flex';
+}
+
+function closeCorrection(){
+  document.getElementById('correctionModal').style.display = 'none';
+}
+
+async function submitCorrection(){
+  const correction = document.getElementById('correctionText').value.trim();
+  if (!correction) return alert('Write correction');
+
+  // send to server
+  const res = await fetch('/api/admin/feedback', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      question: lastQ,
+      botAnswer: lastBotA,
+      userCorrection: correction,
+      adminUser: 'admin@example.com'
+    })
+  });
+  const r = await res.json();
+  if (r.ok) {
+    closeCorrection();
+    appendMessage('me', `Correction saved ✅`);
+  } else {
+    alert('Error: ' + (r.error || 'unknown'));
+  }
+}
+
+function copyAnswer(btn){
+  const text = lastBotA || '';
+  navigator.clipboard?.writeText(text);
+  btn.innerText = 'Copied';
+  setTimeout(()=>btn.innerText = 'Copy', 1000);
+}
+</script>
+</body>
+</html>

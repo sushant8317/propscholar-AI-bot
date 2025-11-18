@@ -1,68 +1,116 @@
 // src/services/vector.service.ts
-
 import { KnowledgeModel } from "../models/knowledge.model";
 
 export class VectorService {
 
   // -------------------------------------------------
-  // COSINE SIMILARITY
+  // Normalize a vector (important for consistent similarity)
   // -------------------------------------------------
-  private cosineSimilarity(a: number[], b: number[]): number {
-    if (!a || !b || a.length === 0 || b.length === 0) return 0;
-
-    const dot = a.reduce((sum, v, i) => sum + v * b[i], 0);
-    const magA = Math.sqrt(a.reduce((s, v) => s + v * v, 0));
-    const magB = Math.sqrt(b.reduce((s, v) => s + v * v, 0));
-
-    return magA && magB ? dot / (magA * magB) : 0;
+  private normalize(vec: number[]): number[] {
+    const mag = Math.sqrt(vec.reduce((sum, x) => sum + x * x, 0));
+    return mag === 0 ? vec : vec.map((v) => v / mag);
   }
 
   // -------------------------------------------------
-  // UPSERT EMBEDDING — CLEAN & CORRECT
+  // Cosine similarity (max-safe)
+  // -------------------------------------------------
+  private cosineSimilarity(a: number[], b: number[]): number {
+    if (!a || !b || a.length !== b.length) return 0;
+    let dot = 0;
+    for (let i = 0; i < a.length; i++) dot += a[i] * b[i];
+    return dot;
+  }
+
+  // -------------------------------------------------
+  // Store / Update embedding
   // -------------------------------------------------
   async upsertEmbedding(
     id: string,
     content: string,
     embedding: number[],
-    metadata: any
+    metadata: Record<string, any> = {}
   ) {
     try {
-      return await KnowledgeModel.findOneAndUpdate(
-        { "metadata.sourceId": id },  // 🔥 MATCH by metadata.sourceId
-        {
-          content,
-          embedding,
-          metadata: {
-            ...metadata,
-            sourceId: id,
-          }
+      const normalized = this.normalize(embedding);
+
+      const query = { "metadata.sourceId": id };
+
+      const update = {
+        content,
+        embedding: normalized,
+        metadata: {
+          ...metadata,
+          sourceId: id,
         },
-        { upsert: true, new: true }
-      );
+        updatedAt: new Date(),
+      };
+
+      const opts = { upsert: true, new: true, setDefaultsOnInsert: true };
+
+      return await KnowledgeModel.findOneAndUpdate(query, update, opts);
     } catch (err) {
-      console.error("❌ VectorService.upsertEmbedding ERROR:", err);
+      console.error("❌ VectorService upsertEmbedding ERROR:", err);
       throw err;
     }
   }
 
   // -------------------------------------------------
-  // FIND SIMILAR DOCS — RAG
+  // Main RAG vector search
   // -------------------------------------------------
-  async findSimilar(queryEmbedding: number[], topK = 7, minScore = 0.20) {
-    const docs = await KnowledgeModel.find().lean();
+  async findSimilar(
+    queryEmbedding: number[],
+    topK = 7,
+    minScore = 0.20,
+    filters: any = {}
+  ) {
+    // Normalize query for more stable ranking
+    const normalizedQuery = this.normalize(queryEmbedding);
 
-    const valid = docs.filter(
-      (d: any) => Array.isArray(d.embedding) && d.embedding.length > 0
-    );
+    // Fetch docs
+    const mongoFilter: any = { ...filters };
+    mongoFilter["embedding.0"] = { $exists: true };
 
-    const scored = valid.map((doc: any) => ({
-      ...doc,
-      score: this.cosineSimilarity(queryEmbedding, doc.embedding)
-    }));
+    const docs = await KnowledgeModel.find(mongoFilter)
+      .select("content embedding metadata createdAt")
+      .lean();
 
-    return scored
-      .filter((x) => x.score >= minScore)
+    if (!docs || docs.length === 0) return [];
+
+    // Score docs
+    const scored = docs.map((doc) => {
+      const emb = doc.embedding || [];
+      const sim = this.cosineSimilarity(normalizedQuery, emb);
+      return { ...doc, score: sim };
+    });
+
+    // Filter + sort + top K
+    const results = scored
+      .filter((d) => d.score >= minScore)
       .sort((a, b) => b.score - a.score)
       .slice(0, topK);
+
+    return results;
+  }
+
+  // -------------------------------------------------
+  // Optional: Bulk indexing for admin tools
+  // -------------------------------------------------
+  async bulkUpsert(items: any[]) {
+    const ops = items.map((it) => ({
+      updateOne: {
+        filter: { "metadata.sourceId": it.id },
+        update: {
+          $set: {
+            content: it.content,
+            embedding: this.normalize(it.embedding),
+            metadata: { ...it.metadata, sourceId: it.id },
+            updatedAt: new Date(),
+          },
+        },
+        upsert: true,
+      },
+    }));
+
+    return KnowledgeModel.bulkWrite(ops);
   }
 }

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <title><%= title %></title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@4.4.24/dist/full.min.css" rel="stylesheet">
+
+  <style>
+    body { background: #0b1220; color: #e6eef7; }
+    .card-custom { background:#0f172a; border:1px solid #1e293b; }
+  </style>
+</head>
+
+<body class="p-8">
+
+  <h1 class="text-2xl font-bold mb-6">Feedback Review</h1>
+
+  <div class="overflow-x-auto">
+    <table class="table table-zebra w-full">
+      <thead>
+        <tr class="text-sm">
+          <th>Question</th>
+          <th>Bot Answer</th>
+          <th>Correction</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <% items.forEach(i => { %>
+          <tr class="align-top text-sm">
+            <td><%= i.question %></td>
+
+            <td class="opacity-75 max-w-xs">
+              <%= i.botAnswer %>
+            </td>
+
+            <td class="text-green-400 max-w-xs">
+              <%= i.userCorrection %>
+            </td>
+
+            <td>
+              <% if(i.status === "approved") { %>
+                <span class="badge badge-success">Approved</span>
+              <% } else if(i.status === "rejected") { %>
+                <span class="badge badge-error">Rejected</span>
+              <% } else { %>
+                <span class="badge badge-warning">Pending</span>
+              <% } %>
+            </td>
+
+            <td class="flex gap-2">
+
+              <button onclick="approve('<%= i._id %>')" class="btn btn-success btn-xs">
+                Approve
+              </button>
+
+              <button onclick="rejectFB('<%= i._id %>')" class="btn btn-warning btn-xs">
+                Reject
+              </button>
+
+              <button onclick="deleteFB('<%= i._id %>')" class="btn btn-error btn-xs">
+                Delete
+              </button>
+
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    async function approve(id) {
+      const res = await fetch("/admin-chat/api/feedback/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id })
+      });
+      location.reload();
+    }
+
+    async function rejectFB(id) {
+      const res = await fetch("/admin-chat/api/feedback/reject", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id })
+      });
+      location.reload();
+    }
+
+    async function deleteFB(id) {
+      if(!confirm("Delete this correction?")) return;
+
+      const res = await fetch("/admin-chat/api/feedback/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id })
+      });
+      location.reload();
+    }
+  </script>
+
+</body>
+</html>
