@@ -191,7 +191,7 @@ Never hallucinate. Never invent new rules.
 Use only the KB or say "no info found".
     `;
 
-    const finalText = await askFinalLLL(finalPrompt);
+    const finalText = await askFinalLLM(finalPrompt);
 
     // 7️⃣ Reply
     await msg.reply(finalText);
