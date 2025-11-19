@@ -12,6 +12,30 @@ import OpenAI from "openai";
 dotenv.config();
 
 // ---------------------------
+// TYPO FIX FUNCTION
+// ---------------------------
+function preprocess(text: string) {
+  const normalize = text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .replace(/(\w)\1{2,}/g, "$1"); // heloooo → helo
+
+  const autocorrectMap: Record<string, string> = {
+    helo: "hello",
+    hlo: "hello",
+    hii: "hi",
+    hiii: "hi",
+    plz: "please",
+    pls: "please",
+  };
+
+  return normalize
+    .split(" ")
+    .map((w) => autocorrectMap[w] || w)
+    .join(" ");
+}
+
+// ---------------------------
 // ROUTERS
 // ---------------------------
 import { router as adminRouter } from "./controllers/admin.controller";
@@ -35,7 +59,7 @@ const memory = new MemoryService();
 const topics = new TopicService();
 
 // ---------------------------
-// OPENAI CLIENT (FINAL LLM)
+// OPENAI CLIENT
 // ---------------------------
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || process.env.OPEN_AI_FINAL_KEY,
@@ -72,7 +96,7 @@ mongoose
   .catch((err) => console.error("MongoDB error:", err));
 
 // ---------------------------
-// FINAL GPT-4.1 FUNCTION
+// FINAL GPT FUNCTION
 // ---------------------------
 async function askFinalLLM(prompt: string): Promise<string> {
   try {
@@ -86,10 +110,10 @@ async function askFinalLLM(prompt: string): Promise<string> {
           content: `
 You are Scholaris AI — PropScholar's official support assistant.
 Rules:
-- Use only PropScholar KB provided in the prompt.
-- If KB is missing data, clearly say it.
-- No emojis. No hallucinations.
-- Professional, short, accurate sentences.
+Use only PropScholar KB provided in the prompt.
+If KB is missing data, clearly say it.
+No emojis. No hallucinations.
+Professional, short, accurate sentences.
           `,
         },
         { role: "user", content: prompt },
@@ -125,7 +149,10 @@ client.on("messageCreate", async (msg) => {
   console.log("📩 USER:", msg.author.username, "→", msg.content);
 
   try {
-    const userQuery = msg.content.trim();
+    // CLEAN USER INPUT
+    let userQuery = msg.content.trim();
+    userQuery = preprocess(userQuery); // 👈 TYPO FIX APPLIED HERE
+
     const userId = msg.author.id;
 
     // 1️⃣ Topic detection
@@ -146,7 +173,7 @@ client.on("messageCreate", async (msg) => {
       [...tox, ...policies]
     );
 
-    // 6️⃣ Final prompt to GPT-4.1
+    // 6️⃣ Final prompt to GPT
     const finalPrompt = `
 User Query: ${userQuery}
 Rewritten Query: ${rewritten.answer}
@@ -159,12 +186,12 @@ ${ragResult.answer}
 Policies Triggered: ${policies.join(", ") || "none"}
 Toxic Flags: ${tox.join(", ") || "none"}
 
-Give a final clean PropScholar answer. 
+Give a final clean PropScholar answer.
 Never hallucinate. Never invent new rules.
 Use only the KB or say "no info found".
     `;
 
-    const finalText = await askFinalLLM(finalPrompt);
+    const finalText = await askFinalLLL(finalPrompt);
 
     // 7️⃣ Reply
     await msg.reply(finalText);
@@ -172,7 +199,6 @@ Use only the KB or say "no info found".
     // 8️⃣ Memory
     await memory.addShortTerm(userId, `User: ${userQuery}`);
     await memory.addShortTerm(userId, `Bot: ${finalText}`);
-
   } catch (err) {
     console.error("🔥 FULL BOT ERROR:", err);
     msg.reply("Internal AI error. Please try again later.");
