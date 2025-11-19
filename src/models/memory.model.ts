@@ -1,34 +1,23 @@
-import mongoose, { Schema, Document } from "mongoose";
+// src/models/memory.model.ts
 
-export interface IMemory extends Document {
-  userId: string;
-  shortTerm: { text: string; createdAt: Date }[];
-  longTerm: { text: string; createdAt: Date }[];
-  currentTopic: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+import mongoose from "mongoose";
 
-const MessageSchema = new Schema(
-  {
-    text: { type: String, required: true },
-    createdAt: { type: Date, default: Date.now },
-  },
-  { _id: false }
-);
+const shortTermSchema = new mongoose.Schema({
+  text: String,
+  createdAt: Date,
+});
 
-const MemorySchema = new Schema<IMemory>(
-  {
-    userId: { type: String, required: true, unique: true },
+const longTermSchema = new mongoose.Schema({
+  text: String,
+  createdAt: Date,
+});
 
-    shortTerm: { type: [MessageSchema], default: [] },
-    longTerm: { type: [MessageSchema], default: [] },
+const MemorySchema = new mongoose.Schema({
+  userId: { type: String, required: true, index: true },
+  shortTerm: { type: [shortTermSchema], default: [] },
+  longTerm: { type: [longTermSchema], default: [] },
+  currentTopic: { type: String, default: "general" },
+  updatedAt: { type: Date, default: Date.now },
+});
 
-    currentTopic: { type: String, default: "general" },
-  },
-  { timestamps: true }
-);
-
-const MemoryModel = mongoose.model<IMemory>("Memory", MemorySchema);
-
-export default MemoryModel;
+export default mongoose.model("Memory", MemorySchema);
