@@ -29,52 +29,12 @@ export class RAGService {
     const res = [base];
 
     const synonyms: Record<string, string[]> = {
-      plus: [
-        "plus model",
-        "ps plus",
-        "1 step",
-        "1-step",
-        "instant funding",
-        "one step",
-        "no news rules",
-        "no consistency rules"
-      ],
-      daily: [
-        "daily dd",
-        "daily drawdown",
-        "maximum daily loss",
-        "daily limit",
-        "dmax",
-        "dd"
-      ],
-      payout: [
-        "withdraw",
-        "withdrawal",
-        "payout schedule",
-        "profit split",
-        "payouts"
-      ],
-      ufm: [
-        "unfair means",
-        "unfair practices",
-        "tick scalping",
-        "signal trading",
-        "copying signals",
-        "exploitation"
-      ],
-      drawdown: [
-        "dd",
-        "maximum loss",
-        "loss limit",
-        "risk limit",
-        "overall drawdown"
-      ],
-      rules: [
-        "evaluation rules",
-        "prop rules",
-        "firm rules",
-        "eligibility rules"
-      ]
+      plus: ["plus model", "ps plus", "1 step", "1-step", "instant funding", "one step", "no news rules", "no consistency rules"],
+      daily: ["daily dd", "daily drawdown", "maximum daily loss", "daily limit", "dmax", "dd"],
+      payout: ["withdraw", "withdrawal", "payout schedule", "profit split", "payouts"],
+      ufm: ["unfair means", "unfair practices", "tick scalping", "signal trading", "copying signals", "exploitation"],
+      drawdown: ["dd", "maximum loss", "loss limit", "risk limit", "overall drawdown"],
+      rules: ["evaluation rules", "prop rules", "firm rules", "eligibility rules"]
     };
 
     for (const key in synonyms) {
@@ -87,19 +47,17 @@ export class RAGService {
   private rerankByTopic(docs: KBDoc[], topic: string): KBDoc[] {
     if (!topic || topic === "general") return docs;
 
-    return docs.map(d => {
+    return docs.map((d) => {
       const cat = (d.metadata?.category || "").toLowerCase();
       let boost = 0;
-
       if (cat.includes(topic.toLowerCase())) boost += 0.4;
-
       return { ...d, score: (d.score || 0) + boost };
     });
   }
 
   private computeConfidence(docs: KBDoc[]): number {
     if (docs.length === 0) return 0;
-    const max = Math.max(...docs.map(d => d.score || 0));
+    const max = Math.max(...docs.map((d) => d.score || 0));
     if (max <= 0) return 0;
     return Number(Math.min(1, max).toFixed(2));
   }
@@ -138,12 +96,8 @@ export class RAGService {
     const ranked = this.rerankByTopic(docs, topic);
     const confidence = this.computeConfidence(ranked);
 
-    // ---------------------------------------------------------
-    // NEW FALLBACK MESSAGE
-    // ---------------------------------------------------------
     if (ranked.length === 0 || confidence < this.HALLUCINATION_THRESHOLD) {
       await this.memory.addShortTerm(userId, `User: ${query}`);
-
       return {
         answer:
           "I don’t have much information regarding this. Let Harris or Sikha come in, they will reply in a better way sir. Until then please have patience.",
@@ -154,7 +108,7 @@ export class RAGService {
 
     const kbContext = ranked
       .slice(0, 8)
-      .map(d => `${d.metadata?.title || ""}\n${d.content}\n---\n`)
+      .map((d) => `${d.metadata?.title || ""}\n${d.content}\n---\n`)
       .join("\n")
       .slice(0, 3500);
 
@@ -162,10 +116,7 @@ export class RAGService {
 You are PropScholar AI.
 Use ONLY the KB context. No hallucination.
 Always output JSON:
-{
- "analysis": "...",
- "answer": "..."
-}
+{ "analysis": "...", "answer": "..." }
 Tone: short, clear, professional.
 `;
 
@@ -197,11 +148,7 @@ ${kbContext}
       rawText = completion.choices?.[0]?.message?.content || null;
     } catch (err) {
       console.error("🔥 RAG LLM ERROR:", err);
-      return {
-        answer: "Internal LLM error.",
-        confidence,
-        usedDocs: []
-      };
+      return { answer: "Internal LLM error.", confidence, usedDocs: [] };
     }
 
     const parsed = this.safeParseJson(rawText);
