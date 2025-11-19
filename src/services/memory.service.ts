@@ -3,10 +3,12 @@
 import MemoryModel from "../models/memory.model";
 
 export class MemoryService {
-  // Always fetch OR recreate clean
+
+  // Always fetch OR create new
   async getMemory(userId: string) {
     let mem = await MemoryModel.findOne({ userId });
 
+    // If missing → create fresh document
     if (!mem) {
       mem = await MemoryModel.create({
         userId,
@@ -17,20 +19,31 @@ export class MemoryService {
       });
     }
 
-    // safety checks - cast to any so TS accepts the assignments
-    if (!Array.isArray((mem as any).shortTerm)) (mem as any).shortTerm = [];
-    if (!Array.isArray((mem as any).longTerm)) (mem as any).longTerm = [];
-    if (!(mem as any).currentTopic) (mem as any).currentTopic = "general";
-
     return mem as any;
   }
 
-  // Crash-Proof Short-Term Memory
+  /* --------------------------------------------------------
+     SAFE createNewMemory — always returns a fresh NEW doc
+  -------------------------------------------------------- */
+  private async createNewMemory(userId: string, opts?: any) {
+    await MemoryModel.deleteOne({ userId });
+    return MemoryModel.create({
+      userId,
+      shortTerm: opts?.shortTerm || [],
+      longTerm: opts?.longTerm || [],
+      currentTopic: opts?.currentTopic || "general",
+      updatedAt: new Date(),
+    });
+  }
+
+  /* --------------------------------------------------------
+     Short Term Memory (Crash Proof)
+  -------------------------------------------------------- */
   async addShortTerm(userId: string, text: string) {
     try {
-      const mem: any = await this.getMemory(userId);
+      let mem: any = await this.getMemory(userId);
 
-      // ensure mem.shortTerm is an array (DocumentArray vs plain array)
+      // Force array shape
       if (!Array.isArray(mem.shortTerm)) mem.shortTerm = [];
 
       mem.shortTerm.push({ text, createdAt: new Date() });
@@ -40,26 +53,26 @@ export class MemoryService {
       }
 
       mem.updatedAt = new Date();
-      await mem.save();
-    } catch (err: any) {
-      console.error("MEMORY SAVE ERROR (shortTerm):", err?.message || err);
+      await mem.save(); // MAIN PLACE THAT WAS FAILING
 
-      // Recreate safe memory document
-      await MemoryModel.findOneAndDelete({ userId }).catch(() => {});
-      await MemoryModel.create({
-        userId,
+    } catch (err: any) {
+      console.error("MEMORY SAVE ERROR (shortTerm):", err?.message);
+
+      // CREATE A TOTALLY NEW CLEAN MEMORY DOC
+      await this.createNewMemory(userId, {
         shortTerm: [{ text, createdAt: new Date() }],
         longTerm: [],
         currentTopic: "general",
-        updatedAt: new Date(),
       });
     }
   }
 
-  // Crash-Proof Long-Term Memory
+  /* --------------------------------------------------------
+     Long Term Memory (Crash Proof)
+  -------------------------------------------------------- */
   async addLongTerm(userId: string, text: string) {
     try {
-      const mem: any = await this.getMemory(userId);
+      let mem: any = await this.getMemory(userId);
 
       if (!Array.isArray(mem.longTerm)) mem.longTerm = [];
 
@@ -71,54 +84,53 @@ export class MemoryService {
 
       mem.updatedAt = new Date();
       await mem.save();
-    } catch (err: any) {
-      console.error("MEMORY SAVE ERROR (longTerm):", err?.message || err);
 
-      await MemoryModel.findOneAndDelete({ userId }).catch(() => {});
-      await MemoryModel.create({
-        userId,
+    } catch (err: any) {
+      console.error("MEMORY SAVE ERROR (longTerm):", err?.message);
+
+      await this.createNewMemory(userId, {
         shortTerm: [],
         longTerm: [{ text, createdAt: new Date() }],
         currentTopic: "general",
-        updatedAt: new Date(),
       });
     }
   }
 
+  /* --------------------------------------------------------
+     Reset Short Term
+  -------------------------------------------------------- */
   async resetShortTerm(userId: string) {
     try {
-      const mem: any = await this.getMemory(userId);
+      let mem: any = await this.getMemory(userId);
+
       mem.shortTerm = [];
       mem.updatedAt = new Date();
       await mem.save();
+
     } catch (err: any) {
-      console.error("MEMORY RESET ERROR:", err?.message || err);
-      await MemoryModel.findOneAndDelete({ userId }).catch(() => {});
-      await MemoryModel.create({
-        userId,
-        shortTerm: [],
-        longTerm: [],
-        currentTopic: "general",
-        updatedAt: new Date(),
-      });
+      console.error("MEMORY RESET ERROR:", err?.message);
+      await this.createNewMemory(userId);
     }
   }
 
+  /* --------------------------------------------------------
+     Update Topic
+  -------------------------------------------------------- */
   async updateTopic(userId: string, topic: string) {
     try {
-      const mem: any = await this.getMemory(userId);
+      let mem: any = await this.getMemory(userId);
+
       mem.currentTopic = topic;
       mem.updatedAt = new Date();
       await mem.save();
+
     } catch (err: any) {
-      console.error("TOPIC UPDATE ERROR:", err?.message || err);
-      await MemoryModel.findOneAndDelete({ userId }).catch(() => {});
-      await MemoryModel.create({
-        userId,
+      console.error("TOPIC UPDATE ERROR:", err?.message);
+
+      await this.createNewMemory(userId, {
         shortTerm: [],
         longTerm: [],
         currentTopic: topic,
-        updatedAt: new Date(),
       });
     }
   }
