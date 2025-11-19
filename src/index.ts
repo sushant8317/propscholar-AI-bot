@@ -12,7 +12,7 @@ import OpenAI from "openai";
 dotenv.config();
 
 /* -------------------------------------------------------
-   LEVEL 2 FUZZY TYPO + SLANG NORMALIZATION
+   FUZZY TYPO CORRECTION + SLANG NORMALIZATION
 ------------------------------------------------------- */
 
 function levenshtein(a: string, b: string): number {
@@ -32,7 +32,6 @@ function levenshtein(a: string, b: string): number {
       );
     }
   }
-
   return matrix[a.length][b.length];
 }
 
@@ -47,7 +46,6 @@ function fuzzyCorrect(word: string, dictionary: string[]): string {
       best = d;
     }
   }
-
   return best;
 }
 
@@ -67,36 +65,14 @@ function preprocess(text: string) {
     thnx: "thanks",
     thanx: "thanks",
     wht: "what",
-    dly: "daily",
+    dly: "daily"
   };
 
   const dictionary = [
-    "hello",
-    "hi",
-    "daily",
-    "drawdown",
-    "rules",
-    "trading",
-    "news",
-    "payout",
-    "withdraw",
-    "profit",
-    "split",
-    "challenge",
-    "account",
-    "limit",
-    "maximum",
-    "loss",
-    "breach",
-    "consistency",
-    "model",
-    "plus",
-    "funded",
-    "reset",
-    "evaluation",
-    "instant",
-    "dd",
-    "dmax",
+    "hello", "hi", "daily", "drawdown", "rules", "trading", "news",
+    "payout", "withdraw", "profit", "split", "challenge", "account",
+    "limit", "maximum", "loss", "breach", "consistency", "model",
+    "plus", "funded", "reset", "evaluation", "instant", "dd", "dmax"
   ];
 
   return normalize
@@ -107,6 +83,43 @@ function preprocess(text: string) {
     })
     .join(" ");
 }
+
+/* -------------------------------------------------------
+   MOOD SERVICE (PROFESSIONAL TONE ENGINE)
+------------------------------------------------------- */
+
+class MoodService {
+  detectMood(message: string): string {
+    const text = message.toLowerCase();
+
+    if (/fuck|madarchod|gandu|bc|mc|idiot|stupid/.test(text)) return "angry";
+    if (/sad|upset|low|depressed|tired/.test(text)) return "sad";
+    if (/fast|urgent|jaldi|quick/.test(text)) return "urgent";
+    if (/thank|great|nice|awesome/.test(text)) return "positive";
+    if (/confused|explain again|not sure/.test(text)) return "confused";
+
+    return "neutral";
+  }
+
+  professionalTone(mood: string): string {
+    switch (mood) {
+      case "angry":
+        return "Maintain calm tone, de-escalate politely, stay respectful and firm.";
+      case "sad":
+        return "Use a gentle, supportive professional tone.";
+      case "urgent":
+        return "Use concise, direct, fast-response professional tone.";
+      case "positive":
+        return "Match positivity while keeping it professional.";
+      case "confused":
+        return "Use simple, clear, step-by-step professional explanation.";
+      default:
+        return "Use standard clean professional support tone.";
+    }
+  }
+}
+
+const moodService = new MoodService();
 
 /* -------------------------------------------------------
    ROUTERS
@@ -136,7 +149,7 @@ const topics = new TopicService();
 ------------------------------------------------------- */
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || process.env.OPEN_AI_FINAL_KEY,
+  apiKey: process.env.OPENAI_API_KEY || process.env.OPEN_AI_FINAL_KEY
 });
 
 /* -------------------------------------------------------
@@ -154,7 +167,7 @@ app.use(
   "/admin",
   basicAuth({
     users: { admin: process.env.ADMIN_API_KEY || "propscholar2069" },
-    challenge: true,
+    challenge: true
   })
 );
 
@@ -171,35 +184,33 @@ mongoose
   .catch((err) => console.error("MongoDB error:", err));
 
 /* -------------------------------------------------------
-   FINAL GPT FUNCTION (AI ENRICHED ANSWERS)
+   ASK FINAL LLM (AI-ENRICHED + TONE ENGINE)
 ------------------------------------------------------- */
 
 async function askFinalLLM(prompt: string): Promise<string> {
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4.1",
-      temperature: 0.4,
-      max_tokens: 350,
+      temperature: 0.3,
+      max_tokens: 400,
       messages: [
         {
           role: "system",
           content: `
 You are Scholaris AI — PropScholar's official support assistant.
 
-RULES FOR ANSWERING:
-- Use the PropScholar KB Answer as the factual base.
-- You MAY expand it with intelligent explanations, examples, and clarification.
-- DO NOT invent new PropScholar rules.
-- If KB is missing information, fill gaps using general trading knowledge ONLY.
-- If KB has no relevant info, say:
+Follow these rules:
+- Use PropScholar KB as factual base.
+- Expand the KB answer intelligently with clarification & reasoning.
+- Follow the Tone Instruction strictly.
+- Do NOT invent new PropScholar rules.
+- No emojis.
+- If KB has no info, respond:
 "I don’t have much information regarding this. Let Harris or Sikha come in, they will reply in a better way sir. Until then please have patience."
-
-Tone: professional, clear, short, helpful.
-No emojis.
-          `,
+`
         },
-        { role: "user", content: prompt },
-      ],
+        { role: "user", content: prompt }
+      ]
     });
 
     return completion.choices[0].message?.content || "Error generating response.";
@@ -217,8 +228,8 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-  ],
+    GatewayIntentBits.MessageContent
+  ]
 });
 
 client.on("clientReady", () => console.log("🤖 Discord bot ready!"));
@@ -230,13 +241,14 @@ client.on("clientReady", () => console.log("🤖 Discord bot ready!"));
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
 
-  console.log("📩 USER:", msg.author.username, "→", msg.content);
-
   try {
     let userQuery = preprocess(msg.content.trim());
     const userId = msg.author.id;
 
     const detectedTopic = topics.detectTopic(userQuery);
+    const mood = moodService.detectMood(userQuery);
+    const toneInstruction = moodService.professionalTone(mood);
+
     const tox = await toxic.check(userQuery);
     const ragResult = await rag.generateResponse(userId, userQuery, detectedTopic);
     const policies = inspector.inspect(userQuery);
@@ -251,6 +263,8 @@ User Query: ${userQuery}
 Rewritten Query: ${rewritten.answer}
 
 Detected Topic: ${detectedTopic}
+Detected Mood: ${mood}
+Tone Instruction: ${toneInstruction}
 
 PropScholar KB Answer:
 ${ragResult.answer}
@@ -259,11 +273,12 @@ Policies Triggered: ${policies.join(", ") || "none"}
 Toxic Flags: ${tox.join(", ") || "none"}
 
 Your job:
-Use the KB as truth.
-Expand the explanation intelligently.
-Never invent new PropScholar rules.
-If KB is empty → reply with fallback message.
-    `;
+- Use KB truth.
+- Expand intelligently.
+- Follow Tone Instruction.
+- Never invent new PropScholar rules.
+- If KB is empty → fallback.
+`;
 
     const finalText = await askFinalLLM(finalPrompt);
 
@@ -271,7 +286,6 @@ If KB is empty → reply with fallback message.
 
     await memory.addShortTerm(userId, `User: ${userQuery}`);
     await memory.addShortTerm(userId, `Bot: ${finalText}`);
-
   } catch (err) {
     console.error("🔥 FULL BOT ERROR:", err);
     msg.reply("Internal AI error. Try again in a moment.");
@@ -279,7 +293,7 @@ If KB is empty → reply with fallback message.
 });
 
 /* -------------------------------------------------------
-   LOGIN TO DISCORD
+   LOGIN
 ------------------------------------------------------- */
 
 client.login(process.env.DISCORD_TOKEN);
@@ -299,12 +313,6 @@ app.get("/", (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));
 
-/* -------------------------------------------------------
-   INGEST (OPTIONAL)
-------------------------------------------------------- */
-
 if (process.env.INGEST_ON_STARTUP === "true") {
-  import("./scripts/ingest-data").then(() =>
-    console.log("📥 KB Ingest complete")
-  );
+  import("./scripts/ingest-data").then(() => console.log("📥 KB Ingest complete"));
 }
