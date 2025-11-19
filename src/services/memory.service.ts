@@ -3,7 +3,6 @@
 import MemoryModel from "../models/memory.model";
 
 export class MemoryService {
-  
   // Always fetch OR recreate clean
   async getMemory(userId: string) {
     let mem = await MemoryModel.findOne({ userId });
@@ -18,18 +17,21 @@ export class MemoryService {
       });
     }
 
-    // safety checks
-    if (!Array.isArray(mem.shortTerm)) mem.shortTerm = [];
-    if (!Array.isArray(mem.longTerm)) mem.longTerm = [];
-    if (!mem.currentTopic) mem.currentTopic = "general";
+    // safety checks - cast to any so TS accepts the assignments
+    if (!Array.isArray((mem as any).shortTerm)) (mem as any).shortTerm = [];
+    if (!Array.isArray((mem as any).longTerm)) (mem as any).longTerm = [];
+    if (!(mem as any).currentTopic) (mem as any).currentTopic = "general";
 
-    return mem;
+    return mem as any;
   }
 
-  // 🛠 Crash-Proof Short-Term Memory
+  // Crash-Proof Short-Term Memory
   async addShortTerm(userId: string, text: string) {
     try {
-      const mem = await this.getMemory(userId);
+      const mem: any = await this.getMemory(userId);
+
+      // ensure mem.shortTerm is an array (DocumentArray vs plain array)
+      if (!Array.isArray(mem.shortTerm)) mem.shortTerm = [];
 
       mem.shortTerm.push({ text, createdAt: new Date() });
 
@@ -38,13 +40,12 @@ export class MemoryService {
       }
 
       mem.updatedAt = new Date();
-      await mem.save(); // <-- sometimes fails on Render (VersionError)
+      await mem.save();
     } catch (err: any) {
-      console.error("MEMORY SAVE ERROR (shortTerm):", err.message);
+      console.error("MEMORY SAVE ERROR (shortTerm):", err?.message || err);
 
-      // FIX: Recreate safe memory document
-      await MemoryModel.findOneAndDelete({ userId });
-
+      // Recreate safe memory document
+      await MemoryModel.findOneAndDelete({ userId }).catch(() => {});
       await MemoryModel.create({
         userId,
         shortTerm: [{ text, createdAt: new Date() }],
@@ -55,10 +56,12 @@ export class MemoryService {
     }
   }
 
-  // 🛠 Crash-Proof Long-Term Memory
+  // Crash-Proof Long-Term Memory
   async addLongTerm(userId: string, text: string) {
     try {
-      const mem = await this.getMemory(userId);
+      const mem: any = await this.getMemory(userId);
+
+      if (!Array.isArray(mem.longTerm)) mem.longTerm = [];
 
       mem.longTerm.push({ text, createdAt: new Date() });
 
@@ -69,10 +72,9 @@ export class MemoryService {
       mem.updatedAt = new Date();
       await mem.save();
     } catch (err: any) {
-      console.error("MEMORY SAVE ERROR (longTerm):", err.message);
+      console.error("MEMORY SAVE ERROR (longTerm):", err?.message || err);
 
-      await MemoryModel.findOneAndDelete({ userId });
-
+      await MemoryModel.findOneAndDelete({ userId }).catch(() => {});
       await MemoryModel.create({
         userId,
         shortTerm: [],
@@ -85,13 +87,13 @@ export class MemoryService {
 
   async resetShortTerm(userId: string) {
     try {
-      const mem = await this.getMemory(userId);
+      const mem: any = await this.getMemory(userId);
       mem.shortTerm = [];
       mem.updatedAt = new Date();
       await mem.save();
     } catch (err: any) {
-      console.error("MEMORY RESET ERROR:", err.message);
-      await MemoryModel.findOneAndDelete({ userId });
+      console.error("MEMORY RESET ERROR:", err?.message || err);
+      await MemoryModel.findOneAndDelete({ userId }).catch(() => {});
       await MemoryModel.create({
         userId,
         shortTerm: [],
@@ -104,13 +106,13 @@ export class MemoryService {
 
   async updateTopic(userId: string, topic: string) {
     try {
-      const mem = await this.getMemory(userId);
+      const mem: any = await this.getMemory(userId);
       mem.currentTopic = topic;
       mem.updatedAt = new Date();
       await mem.save();
     } catch (err: any) {
-      console.error("TOPIC UPDATE ERROR:", err.message);
-      await MemoryModel.findOneAndDelete({ userId });
+      console.error("TOPIC UPDATE ERROR:", err?.message || err);
+      await MemoryModel.findOneAndDelete({ userId }).catch(() => {});
       await MemoryModel.create({
         userId,
         shortTerm: [],
