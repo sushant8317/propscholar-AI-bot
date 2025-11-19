@@ -1,9 +1,7 @@
-// src/index.ts
-
 import express from "express";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
-import { Client, GatewayIntentBits, GuildMember } from "discord.js";
+import { Client, GatewayIntentBits } from "discord.js";
 import bodyParser from "body-parser";
 import basicAuth from "express-basic-auth";
 import path from "path";
@@ -12,7 +10,7 @@ import OpenAI from "openai";
 dotenv.config();
 
 /* -------------------------------------------------------
-   FUZZY TYPO + SLANG NORMALIZATION
+   FUZZY TYPO CORRECTION + SLANG NORMALIZATION
 ------------------------------------------------------- */
 
 function levenshtein(a: string, b: string): number {
@@ -77,15 +75,12 @@ function preprocess(text: string) {
 
   return normalize
     .split(" ")
-    .map((word) => {
-      if (slangMap[word]) return slangMap[word];
-      return fuzzyCorrect(word, dictionary);
-    })
+    .map((word) => slangMap[word] || fuzzyCorrect(word, dictionary))
     .join(" ");
 }
 
 /* -------------------------------------------------------
-   MOOD SERVICE (PROFESSIONAL TONE ENGINE)
+   MOOD & PROFESSIONAL TONE ENGINE
 ------------------------------------------------------- */
 
 class MoodService {
@@ -104,17 +99,17 @@ class MoodService {
   professionalTone(mood: string): string {
     switch (mood) {
       case "angry":
-        return "Maintain calm tone, de-escalate politely, stay respectful and firm.";
+        return "Stay calm, de-escalate politely, be firm but respectful.";
       case "sad":
-        return "Use a gentle, supportive professional tone.";
+        return "Be supportive and gentle but professional.";
       case "urgent":
-        return "Use concise, direct, fast-response professional tone.";
+        return "Be concise and direct.";
       case "positive":
-        return "Match positivity while keeping it professional.";
+        return "Stay professional but match the energy.";
       case "confused":
-        return "Use simple, clear, step-by-step professional explanation.";
+        return "Explain simply in a step-by-step way.";
       default:
-        return "Use standard clean professional support tone.";
+        return "Use a clean professional support tone.";
     }
   }
 }
@@ -149,7 +144,7 @@ const topics = new TopicService();
 ------------------------------------------------------- */
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || process.env.OPEN_AI_FINAL_KEY
+  apiKey: process.env.OPENAI_API_KEY
 });
 
 /* -------------------------------------------------------
@@ -184,96 +179,43 @@ mongoose
   .catch((err) => console.error("MongoDB error:", err));
 
 /* -------------------------------------------------------
-   SMART MODEL SELECTION LOGIC
+   SMART MODEL SWITCHING
 ------------------------------------------------------- */
 
-/**
- * Decide model based on
- * - complexity score
- * - mood (angry/sensitive => prefer stronger model)
- * - moderator tag => strong model
- */
-function complexityScore(text: string): number {
-  const len = Math.min(1200, text.length);
-  let score = 0;
+function chooseModel(query: string, moderatorSummon: boolean): "gpt-4.1" | "gpt-4.1-mini" {
 
-  // length contributes
-  if (len > 300) score += 2;
-  else if (len > 150) score += 1;
+  if (moderatorSummon) return "gpt-4.1";
 
-  // question words: more likely complex
-  const qWords = ["why", "how", "explain", "compare", "difference", "steps", "strategy"];
-  for (const q of qWords) {
-    if (text.includes(q)) score += 0.8;
-  }
+  if (query.length < 8) return "gpt-4.1-mini";
 
-  // presence of multiple clauses (commas)
-  const commas = (text.match(/,/g) || []).length;
-  if (commas >= 2) score += 0.6;
+  if (/explain|difference|compare|why|how/.test(query)) return "gpt-4.1";
 
-  // presence of specialized tokens
-  const specialist = ["drawdown", "payout", "consistency", "breach", "trailing", "scalping"];
-  for (const s of specialist) if (text.includes(s)) score += 0.4;
-
-  // normalize to 0..5
-  return Math.min(5, score);
-}
-
-function chooseModel(opts: {
-  userText: string;
-  detectedMood: string;
-  isModeratorCall: boolean;
-  ragConfidence?: number;
-}): { model: string; reason: string } {
-  const { userText, detectedMood, isModeratorCall, ragConfidence } = opts;
-
-  // If moderator explicitly called the bot, always full model
-  if (isModeratorCall) return { model: "gpt-4.1", reason: "Moderator requested full model" };
-
-  // If mood is angry or sensitive, prefer full model for safe handling
-  if (detectedMood === "angry" || detectedMood === "sad") {
-    return { model: "gpt-4.1", reason: "Sensitive mood (angry/sad) detected" };
-  }
-
-  // If RAG had very low confidence, use full model to avoid mistakes
-  if (typeof ragConfidence === "number" && ragConfidence < 0.2) {
-    return { model: "gpt-4.1", reason: "Low RAG confidence" };
-  }
-
-  // compute complexity
-  const c = complexityScore(userText);
-
-  // threshold: 1.5 and above => use full; else use mini
-  if (c >= 1.5) {
-    return { model: "gpt-4.1", reason: `Complexity ${c.toFixed(2)} >= 1.5` };
-  }
-
-  return { model: "gpt-4.1-mini", reason: `Complexity ${c.toFixed(2)} < 1.5` };
+  return "gpt-4.1-mini";
 }
 
 /* -------------------------------------------------------
-   FINAL ASK FUNCTION (model param)
+   ASK FINAL LLM
 ------------------------------------------------------- */
 
-async function askFinalLLMWithModel(prompt: string, model: string): Promise<string> {
+async function askFinalLLM(prompt: string, model: string): Promise<string> {
   try {
     const completion = await openai.chat.completions.create({
       model,
-      temperature: model === "gpt-4.1" ? 0.35 : 0.15,
-      max_tokens: model === "gpt-4.1" ? 600 : 400,
+      temperature: 0.3,
+      max_tokens: 400,
       messages: [
         {
           role: "system",
           content: `
 You are Scholaris AI — PropScholar's official support assistant.
 
-RULES:
-- Use the PropScholar KB answer as the factual base.
-- You may expand with clear explanation, examples and step-by-step reasoning.
-- Do NOT invent new PropScholar rules.
-- Follow the Tone Instruction provided in the prompt.
+Rules:
+- Use KB as truth.
+- Expand with intelligent clarification.
+- Follow tone instructions.
+- NO new PropScholar rules.
 - No emojis.
-- If KB has no info, respond exactly:
+- If KB is empty, say:
 "I don’t have much information regarding this. Let Harris or Sikha come in, they will reply in a better way sir. Until then please have patience."
 `
         },
@@ -283,7 +225,7 @@ RULES:
 
     return completion.choices[0].message?.content || "Error generating response.";
   } catch (err: any) {
-    console.error("🔥 GPT ERROR:", err?.response?.data || err?.message || err);
+    console.error("GPT ERROR:", err.response?.data || err.message);
     return "Internal AI error.";
   }
 }
@@ -309,119 +251,88 @@ client.on("clientReady", () => console.log("🤖 Discord bot ready!"));
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
 
-  /* ----- MODERATOR IGNORE SYSTEM ----- */
-  const moderators = ["harris_ps", "sikhaps", "harris", "sikha", "ps_admin"];
-  const username = (msg.author.username || "").toLowerCase();
+  const isModerator = msg.member?.roles.cache.some(r =>
+    ["Moderator", "Admin", "Staff"].includes(r.name)
+  );
 
-  // Basic username check (optionally you can use roles later)
-  const isModerator = moderators.some(m => username.includes(m.toLowerCase()));
+  const moderatorSummon = msg.content.includes("@Scholaris");
 
-  // Did the author explicitly mention/tag Scholaris or use scholaris: prefix?
-  const contentLower = (msg.content || "").toLowerCase();
-  const mentionedScholaris =
-    (msg.mentions && msg.mentions.users.size > 0 && msg.mentions.users.some(u => u.username.toLowerCase().includes("scholaris"))) ||
-    contentLower.includes("@scholaris") ||
-    contentLower.includes("scholaris:");
-
-  if (isModerator && !mentionedScholaris) {
-    console.log("⛔ Moderator message ignored:", msg.content);
-    return; // do not process moderator messages unless they tag the bot
-  }
+  if (isModerator && !moderatorSummon) return;
 
   try {
-    // 1) preprocess
-    const rawUserMessage = msg.content.trim();
-    let userQuery = preprocess(rawUserMessage);
+    const rawText = msg.content.trim();
+    let userQuery = preprocess(rawText);
     const userId = msg.author.id;
 
-    // 2) topic / mood
     const detectedTopic = topics.detectTopic(userQuery);
     const mood = moodService.detectMood(userQuery);
     const toneInstruction = moodService.professionalTone(mood);
 
-    // 3) toxicity and policies
     const tox = await toxic.check(userQuery);
+    const ragResult = await rag.generateResponse(userId, userQuery, detectedTopic);
     const policies = inspector.inspect(userQuery);
 
-    // 4) RAG retrieval (this may use gpt-4.1-mini internally)
-    const ragResult = await rag.generateResponse(userId, userQuery, detectedTopic);
-    const ragConfidence = (ragResult && (ragResult.confidence || 0)) as number;
-
-    // 5) rewrite for safety
     const rewritten = await scholaris.regenerateWithConstraints(
       userQuery,
       [...tox, ...policies]
     );
 
-    // 6) decide model
-    const isModeratorCall = isModerator && mentionedScholaris;
-    const { model, reason } = chooseModel({
-      userText: userQuery,
-      detectedMood: mood,
-      isModeratorCall,
-      ragConfidence
-    });
+    const model = chooseModel(userQuery, moderatorSummon);
 
-    console.log("Model decision:", model, reason, "topic:", detectedTopic, "mood:", mood);
-
-    // 7) build final prompt for the LLM
     const finalPrompt = `
 User Query: ${userQuery}
 Rewritten Query: ${rewritten.answer}
 
+Moderator Summon: ${moderatorSummon}
 Detected Topic: ${detectedTopic}
-Detected Mood: ${mood}
+Mood: ${mood}
 Tone Instruction: ${toneInstruction}
-Model Selection Reason: ${reason}
 
-PropScholar KB Answer:
+KB Answer:
 ${ragResult.answer}
 
-Policies Triggered: ${policies.join(", ") || "none"}
+Policies: ${policies.join(", ") || "none"}
 Toxic Flags: ${tox.join(", ") || "none"}
 
-Your job:
-- Use the KB answer as truth.
-- Expand the explanation intelligently and clearly.
-- Follow the Tone Instruction strictly.
-- Never invent new PropScholar rules.
-- If KB is empty -> reply with fallback exactly.
+Respond using KB + tone.
 `;
 
-    // 8) LLM call with chosen model
-    const finalText = await askFinalLLMWithModel(finalPrompt, model);
+    const finalText = await askFinalLLM(finalPrompt, model);
 
-    // 9) reply
     await msg.reply(finalText);
 
-    // 10) memory writes
     await memory.addShortTerm(userId, `User: ${userQuery}`);
     await memory.addShortTerm(userId, `Bot: ${finalText}`);
+
   } catch (err) {
-    console.error("🔥 FULL BOT ERROR:", err);
-    try {
-      await msg.reply("Internal AI error. Try again in a moment.");
-    } catch (e) {
-      console.error("Reply failed:", e);
-    }
+    console.error("FULL BOT ERROR:", err);
+    msg.reply("Internal AI error. Try again.");
   }
 });
 
 /* -------------------------------------------------------
-   LOGIN + SERVER
+   LOGIN TO DISCORD
 ------------------------------------------------------- */
 
 client.login(process.env.DISCORD_TOKEN);
 
-const app = express();
-app.get("/", (req, res) => res.send("PropScholar AI Bot Running"));
+/* -------------------------------------------------------
+   ROOT PAGE
+------------------------------------------------------- */
+
+app.get("/", (req, res) => {
+  res.send("PropScholar AI Bot Running");
+});
+
+/* -------------------------------------------------------
+   START SERVER
+------------------------------------------------------- */
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));
 
-/* -------------------------------------------------------
-   OPTIONAL INGEST
-------------------------------------------------------- */
-
 if (process.env.INGEST_ON_STARTUP === "true") {
-  import("./scripts/ingest-data").then(() => console.log("📥 KB Ingest complete"));
+  import("./scripts/ingest-data").then(() =>
+    console.log("📥 KB Ingest complete")
+  );
 }
