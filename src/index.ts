@@ -52,7 +52,6 @@ function fuzzyCorrect(word: string, dictionary: string[]): string {
 }
 
 function preprocess(text: string) {
-  // Normalize repeated letters, symbols, casing
   const normalize = text
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, "")
@@ -72,10 +71,32 @@ function preprocess(text: string) {
   };
 
   const dictionary = [
-    "hello", "hi", "daily", "drawdown", "rules", "trading", "news",
-    "payout", "withdraw", "profit", "split", "challenge", "account",
-    "limit", "maximum", "loss", "breach", "consistency", "model",
-    "plus", "funded", "reset", "evaluation", "instant", "dd", "dmax"
+    "hello",
+    "hi",
+    "daily",
+    "drawdown",
+    "rules",
+    "trading",
+    "news",
+    "payout",
+    "withdraw",
+    "profit",
+    "split",
+    "challenge",
+    "account",
+    "limit",
+    "maximum",
+    "loss",
+    "breach",
+    "consistency",
+    "model",
+    "plus",
+    "funded",
+    "reset",
+    "evaluation",
+    "instant",
+    "dd",
+    "dmax",
   ];
 
   return normalize
@@ -129,7 +150,6 @@ app.use(express.urlencoded({ extended: true }));
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
 
-// Protect admin routes
 app.use(
   "/admin",
   basicAuth({
@@ -151,7 +171,7 @@ mongoose
   .catch((err) => console.error("MongoDB error:", err));
 
 /* -------------------------------------------------------
-   FINAL GPT FUNCTION
+   FINAL GPT FUNCTION (AI ENRICHED ANSWERS)
 ------------------------------------------------------- */
 
 async function askFinalLLM(prompt: string): Promise<string> {
@@ -165,11 +185,17 @@ async function askFinalLLM(prompt: string): Promise<string> {
           role: "system",
           content: `
 You are Scholaris AI — PropScholar's official support assistant.
-Rules:
-Use only PropScholar KB provided in the prompt.
-If KB is missing data, clearly say it.
-No emojis. No hallucinations.
-Professional, short, accurate sentences.
+
+RULES FOR ANSWERING:
+- Use the PropScholar KB Answer as the factual base.
+- You MAY expand it with intelligent explanations, examples, and clarification.
+- DO NOT invent new PropScholar rules.
+- If KB is missing information, fill gaps using general trading knowledge ONLY.
+- If KB has no relevant info, say:
+"I don’t have much information regarding this. Let Harris or Sikha come in, they will reply in a better way sir. Until then please have patience."
+
+Tone: professional, clear, short, helpful.
+No emojis.
           `,
         },
         { role: "user", content: prompt },
@@ -207,9 +233,7 @@ client.on("messageCreate", async (msg) => {
   console.log("📩 USER:", msg.author.username, "→", msg.content);
 
   try {
-    let userQuery = msg.content.trim();
-    userQuery = preprocess(userQuery);
-
+    let userQuery = preprocess(msg.content.trim());
     const userId = msg.author.id;
 
     const detectedTopic = topics.detectTopic(userQuery);
@@ -234,9 +258,11 @@ ${ragResult.answer}
 Policies Triggered: ${policies.join(", ") || "none"}
 Toxic Flags: ${tox.join(", ") || "none"}
 
-Give a final clean PropScholar answer.
-Never hallucinate. Never invent new rules.
-Use only the KB or say "no info found".
+Your job:
+Use the KB as truth.
+Expand the explanation intelligently.
+Never invent new PropScholar rules.
+If KB is empty → reply with fallback message.
     `;
 
     const finalText = await askFinalLLM(finalPrompt);
@@ -245,6 +271,7 @@ Use only the KB or say "no info found".
 
     await memory.addShortTerm(userId, `User: ${userQuery}`);
     await memory.addShortTerm(userId, `Bot: ${finalText}`);
+
   } catch (err) {
     console.error("🔥 FULL BOT ERROR:", err);
     msg.reply("Internal AI error. Try again in a moment.");
