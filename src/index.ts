@@ -11,39 +11,91 @@ import OpenAI from "openai";
 
 dotenv.config();
 
-// ---------------------------
-// TYPO FIX FUNCTION
-// ---------------------------
+/* -------------------------------------------------------
+   LEVEL 2 FUZZY TYPO + SLANG NORMALIZATION
+------------------------------------------------------- */
+
+function levenshtein(a: string, b: string): number {
+  const matrix = Array.from({ length: a.length + 1 }, (_, i) =>
+    Array.from({ length: b.length + 1 }, (_, j) =>
+      i === 0 ? j : j === 0 ? i : 0
+    )
+  );
+
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      );
+    }
+  }
+
+  return matrix[a.length][b.length];
+}
+
+function fuzzyCorrect(word: string, dictionary: string[]): string {
+  let best = word;
+  let lowest = Infinity;
+
+  for (const d of dictionary) {
+    const dist = levenshtein(word, d);
+    if (dist < lowest && dist <= 2) {
+      lowest = dist;
+      best = d;
+    }
+  }
+
+  return best;
+}
+
 function preprocess(text: string) {
+  // Normalize repeated letters, symbols, casing
   const normalize = text
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, "")
-    .replace(/(\w)\1{2,}/g, "$1"); // heloooo → helo
+    .replace(/(\w)\1{2,}/g, "$1");
 
-  const autocorrectMap: Record<string, string> = {
+  const slangMap: Record<string, string> = {
     helo: "hello",
     hlo: "hello",
     hii: "hi",
     hiii: "hi",
     plz: "please",
     pls: "please",
+    thnx: "thanks",
+    thanx: "thanks",
+    wht: "what",
+    dly: "daily",
   };
+
+  const dictionary = [
+    "hello", "hi", "daily", "drawdown", "rules", "trading", "news",
+    "payout", "withdraw", "profit", "split", "challenge", "account",
+    "limit", "maximum", "loss", "breach", "consistency", "model",
+    "plus", "funded", "reset", "evaluation", "instant", "dd", "dmax"
+  ];
 
   return normalize
     .split(" ")
-    .map((w) => autocorrectMap[w] || w)
+    .map((word) => {
+      if (slangMap[word]) return slangMap[word];
+      return fuzzyCorrect(word, dictionary);
+    })
     .join(" ");
 }
 
-// ---------------------------
-// ROUTERS
-// ---------------------------
+/* -------------------------------------------------------
+   ROUTERS
+------------------------------------------------------- */
 import { router as adminRouter } from "./controllers/admin.controller";
 import { router as adminUIRouter } from "./controllers/admin-ui.controller";
 
-// ---------------------------
-// SERVICES
-// ---------------------------
+/* -------------------------------------------------------
+   SERVICES
+------------------------------------------------------- */
 import { RAGService } from "./services/rag.service";
 import { ToxicDetectorService } from "./services/toxicDetector.service";
 import { PolicyInspectorService } from "./services/policyInspector.service";
@@ -58,16 +110,18 @@ const scholaris = new ScholarisService();
 const memory = new MemoryService();
 const topics = new TopicService();
 
-// ---------------------------
-// OPENAI CLIENT
-// ---------------------------
+/* -------------------------------------------------------
+   OPENAI CLIENT
+------------------------------------------------------- */
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || process.env.OPEN_AI_FINAL_KEY,
 });
 
-// ---------------------------
-// EXPRESS APP
-// ---------------------------
+/* -------------------------------------------------------
+   EXPRESS APP
+------------------------------------------------------- */
+
 const app = express();
 app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true }));
@@ -75,7 +129,7 @@ app.use(express.urlencoded({ extended: true }));
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
 
-// Protect ONLY /admin routes
+// Protect admin routes
 app.use(
   "/admin",
   basicAuth({
@@ -87,17 +141,19 @@ app.use(
 app.use("/admin", adminRouter);
 app.use("/admin-ui", adminUIRouter);
 
-// ---------------------------
-// MONGODB
-// ---------------------------
+/* -------------------------------------------------------
+   MONGODB CONNECT
+------------------------------------------------------- */
+
 mongoose
   .connect(process.env.MONGODB_URI!)
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.error("MongoDB error:", err));
 
-// ---------------------------
-// FINAL GPT FUNCTION
-// ---------------------------
+/* -------------------------------------------------------
+   FINAL GPT FUNCTION
+------------------------------------------------------- */
+
 async function askFinalLLM(prompt: string): Promise<string> {
   try {
     const completion = await openai.chat.completions.create({
@@ -122,14 +178,15 @@ Professional, short, accurate sentences.
 
     return completion.choices[0].message?.content || "Error generating response.";
   } catch (err: any) {
-    console.error("🔥 GPT-4.1 ERROR:", err.response?.data || err.message);
+    console.error("🔥 GPT ERROR:", err.response?.data || err.message);
     return "Internal AI error.";
   }
 }
 
-// ---------------------------
-// DISCORD BOT
-// ---------------------------
+/* -------------------------------------------------------
+   DISCORD BOT
+------------------------------------------------------- */
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -138,42 +195,33 @@ const client = new Client({
   ],
 });
 
-client.on("clientReady", () => console.log("🤖 Discord bot ready!"));
+client.on("ready", () => console.log("🤖 Discord bot ready!"));
 
-// ---------------------------
-// BOT MESSAGE HANDLER
-// ---------------------------
+/* -------------------------------------------------------
+   MESSAGE HANDLER
+------------------------------------------------------- */
+
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
 
   console.log("📩 USER:", msg.author.username, "→", msg.content);
 
   try {
-    // CLEAN USER INPUT
     let userQuery = msg.content.trim();
-    userQuery = preprocess(userQuery); // 👈 TYPO FIX APPLIED HERE
+    userQuery = preprocess(userQuery);
 
     const userId = msg.author.id;
 
-    // 1️⃣ Topic detection
     const detectedTopic = topics.detectTopic(userQuery);
-
-    // 2️⃣ Toxicity
     const tox = await toxic.check(userQuery);
-
-    // 3️⃣ RAG retrieval
     const ragResult = await rag.generateResponse(userId, userQuery, detectedTopic);
-
-    // 4️⃣ Policy Checks
     const policies = inspector.inspect(userQuery);
 
-    // 5️⃣ Safety rewrite
     const rewritten = await scholaris.regenerateWithConstraints(
       userQuery,
       [...tox, ...policies]
     );
 
-    // 6️⃣ Final prompt to GPT
     const finalPrompt = `
 User Query: ${userQuery}
 Rewritten Query: ${rewritten.answer}
@@ -193,41 +241,43 @@ Use only the KB or say "no info found".
 
     const finalText = await askFinalLLM(finalPrompt);
 
-    // 7️⃣ Reply
     await msg.reply(finalText);
 
-    // 8️⃣ Memory
     await memory.addShortTerm(userId, `User: ${userQuery}`);
     await memory.addShortTerm(userId, `Bot: ${finalText}`);
   } catch (err) {
     console.error("🔥 FULL BOT ERROR:", err);
-    msg.reply("Internal AI error. Please try again later.");
+    msg.reply("Internal AI error. Try again in a moment.");
   }
 });
 
-// ---------------------------
-// BOT LOGIN
-// ---------------------------
+/* -------------------------------------------------------
+   LOGIN TO DISCORD
+------------------------------------------------------- */
+
 client.login(process.env.DISCORD_TOKEN);
 
-// ---------------------------
-// ROOT PAGE
-// ---------------------------
+/* -------------------------------------------------------
+   ROOT PAGE
+------------------------------------------------------- */
+
 app.get("/", (req, res) => {
   res.send("PropScholar AI Bot Running");
 });
 
-// ---------------------------
-// SERVER START
-// ---------------------------
+/* -------------------------------------------------------
+   SERVER START
+------------------------------------------------------- */
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));
 
-// ---------------------------
-// OPTIONAL INGEST
-// ---------------------------
+/* -------------------------------------------------------
+   INGEST (OPTIONAL)
+------------------------------------------------------- */
+
 if (process.env.INGEST_ON_STARTUP === "true") {
-  import("./scripts/ingest-data").then(() => {
-    console.log("📥 KB Ingest complete");
-  });
+  import("./scripts/ingest-data").then(() =>
+    console.log("📥 KB Ingest complete")
+  );
 }
