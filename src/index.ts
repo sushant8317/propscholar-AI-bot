@@ -3,7 +3,7 @@
 import express from "express";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
-import { Client, GatewayIntentBits } from "discord.js";
+import { Client, GatewayIntentBits, GuildMember } from "discord.js";
 import bodyParser from "body-parser";
 import basicAuth from "express-basic-auth";
 import path from "path";
@@ -184,27 +184,96 @@ mongoose
   .catch((err) => console.error("MongoDB error:", err));
 
 /* -------------------------------------------------------
-   ASK FINAL LLM
+   SMART MODEL SELECTION LOGIC
 ------------------------------------------------------- */
 
-async function askFinalLLM(prompt: string): Promise<string> {
+/**
+ * Decide model based on
+ * - complexity score
+ * - mood (angry/sensitive => prefer stronger model)
+ * - moderator tag => strong model
+ */
+function complexityScore(text: string): number {
+  const len = Math.min(1200, text.length);
+  let score = 0;
+
+  // length contributes
+  if (len > 300) score += 2;
+  else if (len > 150) score += 1;
+
+  // question words: more likely complex
+  const qWords = ["why", "how", "explain", "compare", "difference", "steps", "strategy"];
+  for (const q of qWords) {
+    if (text.includes(q)) score += 0.8;
+  }
+
+  // presence of multiple clauses (commas)
+  const commas = (text.match(/,/g) || []).length;
+  if (commas >= 2) score += 0.6;
+
+  // presence of specialized tokens
+  const specialist = ["drawdown", "payout", "consistency", "breach", "trailing", "scalping"];
+  for (const s of specialist) if (text.includes(s)) score += 0.4;
+
+  // normalize to 0..5
+  return Math.min(5, score);
+}
+
+function chooseModel(opts: {
+  userText: string;
+  detectedMood: string;
+  isModeratorCall: boolean;
+  ragConfidence?: number;
+}): { model: string; reason: string } {
+  const { userText, detectedMood, isModeratorCall, ragConfidence } = opts;
+
+  // If moderator explicitly called the bot, always full model
+  if (isModeratorCall) return { model: "gpt-4.1", reason: "Moderator requested full model" };
+
+  // If mood is angry or sensitive, prefer full model for safe handling
+  if (detectedMood === "angry" || detectedMood === "sad") {
+    return { model: "gpt-4.1", reason: "Sensitive mood (angry/sad) detected" };
+  }
+
+  // If RAG had very low confidence, use full model to avoid mistakes
+  if (typeof ragConfidence === "number" && ragConfidence < 0.2) {
+    return { model: "gpt-4.1", reason: "Low RAG confidence" };
+  }
+
+  // compute complexity
+  const c = complexityScore(userText);
+
+  // threshold: 1.5 and above => use full; else use mini
+  if (c >= 1.5) {
+    return { model: "gpt-4.1", reason: `Complexity ${c.toFixed(2)} >= 1.5` };
+  }
+
+  return { model: "gpt-4.1-mini", reason: `Complexity ${c.toFixed(2)} < 1.5` };
+}
+
+/* -------------------------------------------------------
+   FINAL ASK FUNCTION (model param)
+------------------------------------------------------- */
+
+async function askFinalLLMWithModel(prompt: string, model: string): Promise<string> {
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-4.1",
-      temperature: 0.3,
-      max_tokens: 400,
+      model,
+      temperature: model === "gpt-4.1" ? 0.35 : 0.15,
+      max_tokens: model === "gpt-4.1" ? 600 : 400,
       messages: [
         {
           role: "system",
           content: `
 You are Scholaris AI — PropScholar's official support assistant.
 
-Rules:
-- Use PropScholar KB as factual base.
-- Expand answers with intelligent clarification.
-- Follow tone instructions strictly.
+RULES:
+- Use the PropScholar KB answer as the factual base.
+- You may expand with clear explanation, examples and step-by-step reasoning.
+- Do NOT invent new PropScholar rules.
+- Follow the Tone Instruction provided in the prompt.
 - No emojis.
-- If KB has no info:
+- If KB has no info, respond exactly:
 "I don’t have much information regarding this. Let Harris or Sikha come in, they will reply in a better way sir. Until then please have patience."
 `
         },
@@ -214,7 +283,7 @@ Rules:
 
     return completion.choices[0].message?.content || "Error generating response.";
   } catch (err: any) {
-    console.error("🔥 GPT ERROR:", err.response?.data || err.message);
+    console.error("🔥 GPT ERROR:", err?.response?.data || err?.message || err);
     return "Internal AI error.";
   }
 }
@@ -242,35 +311,60 @@ client.on("messageCreate", async (msg) => {
 
   /* ----- MODERATOR IGNORE SYSTEM ----- */
   const moderators = ["harris_ps", "sikhaps", "harris", "sikha", "ps_admin"];
-  const username = msg.author.username.toLowerCase();
+  const username = (msg.author.username || "").toLowerCase();
 
-  const isModerator = moderators.some(m => username.includes(m));
+  // Basic username check (optionally you can use roles later)
+  const isModerator = moderators.some(m => username.includes(m.toLowerCase()));
+
+  // Did the author explicitly mention/tag Scholaris or use scholaris: prefix?
+  const contentLower = (msg.content || "").toLowerCase();
   const mentionedScholaris =
-    msg.content.toLowerCase().includes("@scholaris") ||
-    msg.content.toLowerCase().includes("scholaris:");
+    (msg.mentions && msg.mentions.users.size > 0 && msg.mentions.users.some(u => u.username.toLowerCase().includes("scholaris"))) ||
+    contentLower.includes("@scholaris") ||
+    contentLower.includes("scholaris:");
 
   if (isModerator && !mentionedScholaris) {
     console.log("⛔ Moderator message ignored:", msg.content);
-    return;
+    return; // do not process moderator messages unless they tag the bot
   }
 
   try {
-    let userQuery = preprocess(msg.content.trim());
+    // 1) preprocess
+    const rawUserMessage = msg.content.trim();
+    let userQuery = preprocess(rawUserMessage);
     const userId = msg.author.id;
 
+    // 2) topic / mood
     const detectedTopic = topics.detectTopic(userQuery);
     const mood = moodService.detectMood(userQuery);
     const toneInstruction = moodService.professionalTone(mood);
 
+    // 3) toxicity and policies
     const tox = await toxic.check(userQuery);
-    const ragResult = await rag.generateResponse(userId, userQuery, detectedTopic);
     const policies = inspector.inspect(userQuery);
 
+    // 4) RAG retrieval (this may use gpt-4.1-mini internally)
+    const ragResult = await rag.generateResponse(userId, userQuery, detectedTopic);
+    const ragConfidence = (ragResult && (ragResult.confidence || 0)) as number;
+
+    // 5) rewrite for safety
     const rewritten = await scholaris.regenerateWithConstraints(
       userQuery,
       [...tox, ...policies]
     );
 
+    // 6) decide model
+    const isModeratorCall = isModerator && mentionedScholaris;
+    const { model, reason } = chooseModel({
+      userText: userQuery,
+      detectedMood: mood,
+      isModeratorCall,
+      ragConfidence
+    });
+
+    console.log("Model decision:", model, reason, "topic:", detectedTopic, "mood:", mood);
+
+    // 7) build final prompt for the LLM
     const finalPrompt = `
 User Query: ${userQuery}
 Rewritten Query: ${rewritten.answer}
@@ -278,6 +372,7 @@ Rewritten Query: ${rewritten.answer}
 Detected Topic: ${detectedTopic}
 Detected Mood: ${mood}
 Tone Instruction: ${toneInstruction}
+Model Selection Reason: ${reason}
 
 PropScholar KB Answer:
 ${ragResult.answer}
@@ -286,48 +381,47 @@ Policies Triggered: ${policies.join(", ") || "none"}
 Toxic Flags: ${tox.join(", ") || "none"}
 
 Your job:
-- Use KB truth.
-- Expand intelligently.
-- Follow Tone Instruction.
+- Use the KB answer as truth.
+- Expand the explanation intelligently and clearly.
+- Follow the Tone Instruction strictly.
 - Never invent new PropScholar rules.
-- If KB is empty → fallback.
+- If KB is empty -> reply with fallback exactly.
 `;
 
-    const finalText = await askFinalLLM(finalPrompt);
+    // 8) LLM call with chosen model
+    const finalText = await askFinalLLMWithModel(finalPrompt, model);
 
+    // 9) reply
     await msg.reply(finalText);
 
+    // 10) memory writes
     await memory.addShortTerm(userId, `User: ${userQuery}`);
     await memory.addShortTerm(userId, `Bot: ${finalText}`);
   } catch (err) {
     console.error("🔥 FULL BOT ERROR:", err);
-    msg.reply("Internal AI error. Try again in a moment.");
+    try {
+      await msg.reply("Internal AI error. Try again in a moment.");
+    } catch (e) {
+      console.error("Reply failed:", e);
+    }
   }
 });
 
 /* -------------------------------------------------------
-   LOGIN
+   LOGIN + SERVER
 ------------------------------------------------------- */
 
 client.login(process.env.DISCORD_TOKEN);
 
-/* -------------------------------------------------------
-   ROOT PAGE
-------------------------------------------------------- */
-
-app.get("/", (req, res) => {
-  res.send("PropScholar AI Bot Running");
-});
-
-/* -------------------------------------------------------
-   START SERVER
-------------------------------------------------------- */
-
+const app = express();
+app.get("/", (req, res) => res.send("PropScholar AI Bot Running"));
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));
 
+/* -------------------------------------------------------
+   OPTIONAL INGEST
+------------------------------------------------------- */
+
 if (process.env.INGEST_ON_STARTUP === "true") {
-  import("./scripts/ingest-data").then(() =>
-    console.log("📥 KB Ingest complete")
-  );
+  import("./scripts/ingest-data").then(() => console.log("📥 KB Ingest complete"));
 }
