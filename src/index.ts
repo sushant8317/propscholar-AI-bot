@@ -79,7 +79,7 @@ function preprocess(text: string) {
 }
 
 /* -------------------------------------------------------
-   MOOD + PROFESSIONAL TONE ENGINE
+   MOOD ENGINE
 ------------------------------------------------------- */
 
 class MoodService {
@@ -103,12 +103,13 @@ class MoodService {
     }
   }
 }
+
 const moodService = new MoodService();
 
 /* -------------------------------------------------------
-   ROUTERS + SERVICES
-   (expects your existing controllers and services)
+   SERVICES + ROUTERS
 ------------------------------------------------------- */
+
 import { router as adminRouter } from "./controllers/admin.controller";
 import { router as adminUIRouter } from "./controllers/admin-ui.controller";
 import { RAGService } from "./services/rag.service";
@@ -133,6 +134,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 /* -------------------------------------------------------
    EXPRESS APP
 ------------------------------------------------------- */
+
 const app = express();
 app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true }));
@@ -146,20 +148,23 @@ app.use(
     challenge: true
   })
 );
+
 app.use("/admin", adminRouter);
 app.use("/admin-ui", adminUIRouter);
 
 /* -------------------------------------------------------
-   MONGODB CONNECT
+   MONGO DB
 ------------------------------------------------------- */
+
 mongoose
   .connect(process.env.MONGODB_URI!)
   .then(() => console.log("MongoDB connected"))
   .catch((err) => console.error("MongoDB error:", err));
 
 /* -------------------------------------------------------
-   SMART MODEL SWITCHING
+   MODEL PICKER
 ------------------------------------------------------- */
+
 function chooseModel(query: string, moderatorSummon: boolean): "gpt-4.1" | "gpt-4.1-mini" {
   if (moderatorSummon) return "gpt-4.1";
   if (query.length < 8) return "gpt-4.1-mini";
@@ -168,8 +173,9 @@ function chooseModel(query: string, moderatorSummon: boolean): "gpt-4.1" | "gpt-
 }
 
 /* -------------------------------------------------------
-   FINAL ASK (model param)
+   FINAL ANSWER ENGINE
 ------------------------------------------------------- */
+
 async function askFinalLLM(prompt: string, model: string): Promise<string> {
   try {
     const completion = await openai.chat.completions.create({
@@ -177,32 +183,32 @@ async function askFinalLLM(prompt: string, model: string): Promise<string> {
       temperature: model === "gpt-4.1" ? 0.35 : 0.15,
       max_tokens: model === "gpt-4.1" ? 600 : 400,
       messages: [
-        { role: "system", content: `
+        {
+          role: "system",
+          content: `
 You are Scholaris AI — PropScholar's official support assistant.
-
-Rules:
-- Use the PropScholar KB answer as factual base.
-- You may expand with clear explanations.
-- Do not invent new PropScholar rules.
-- Follow Tone Instruction provided in the user prompt.
+- Use KB as truth.
+- No new rules.
+- Follow tone.
 - No emojis.
-- If KB has no info, respond exactly:
-"I don’t have much information regarding this. Let Harris or Sikha come in, they will reply in a better way sir. Until then please have patience."
-` },
+- If no KB info: "I don’t have much information regarding this. Let Harris or Sikha come in, they will reply in a better way sir. Until then please have patience."
+`
+        },
         { role: "user", content: prompt }
       ]
     });
+
     return completion.choices[0].message?.content || "Error generating response.";
-  } catch (err: any) {
-    console.error("GPT ERROR:", err?.response?.data || err?.message || err);
+  } catch (e) {
+    console.error("GPT ERROR: ", e);
     return "Internal AI error.";
   }
 }
 
 /* -------------------------------------------------------
-   Moderator role names (exact from your server screenshot)
-   Reference image: /mnt/data/bfe00441-b6fc-4449-9586-f8fa379ad7ae.png
+   MOD ROLES
 ------------------------------------------------------- */
+
 const MOD_ROLES = [
   "Harris | Moderator",
   "Sikha | Moderator",
@@ -212,8 +218,9 @@ const MOD_ROLES = [
 ];
 
 /* -------------------------------------------------------
-   Moderator activity tracking + pending question queue
+   Pending Queue
 ------------------------------------------------------- */
+
 type PendingQuestion = {
   channelId: string;
   userId: string;
@@ -229,10 +236,9 @@ type PendingQuestion = {
   createdAt: number;
 };
 
-const lastModeratorMessageAt: Record<string, number> = {}; // channelId -> timestamp
+const lastModeratorMessageAt: Record<string, number> = {};
 const pendingQuestionByChannel: Record<string, PendingQuestion | null> = {};
 
-/* helpers */
 function isModeratorMember(member: any): boolean {
   if (!member) return false;
   const roles = member.roles?.cache;
@@ -243,6 +249,7 @@ function isModeratorMember(member: any): boolean {
 /* -------------------------------------------------------
    DISCORD BOT
 ------------------------------------------------------- */
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -254,7 +261,7 @@ const client = new Client({
 client.on("clientReady", () => console.log("🤖 Discord bot ready!"));
 
 /* -------------------------------------------------------
-   MESSAGE HANDLER (with full moderator-silent + 5min logic)
+   MESSAGE LOGIC (with 1-minute mod silence)
 ------------------------------------------------------- */
 
 client.on("messageCreate", async (msg: Message) => {
@@ -263,83 +270,63 @@ client.on("messageCreate", async (msg: Message) => {
   const channelId = (msg.channel as TextChannel).id;
   const now = Date.now();
   const member = msg.member;
-  const authorIsModerator = isModeratorMember(member);
-  const moderatorSummon = msg.mentions.users?.some(u => u.username?.toLowerCase()?.includes("scholaris")) || msg.content.toLowerCase().includes("@scholaris") || msg.content.toLowerCase().startsWith("scholaris");
 
-  // If author is a moderator and not summoning the bot:
-  // - update lastModeratorMessageAt for this channel
-  // - if there is a pending question for this channel, mark moderator replied and cancel pending
+  const rawUserMessage = msg.content.trim();
+  const authorIsModerator = isModeratorMember(member);
+
+  const explicitlySummoned =
+    rawUserMessage.toLowerCase().includes("scholaris") ||
+    msg.mentions.users?.some((u) => u.username?.toLowerCase()?.includes("scholaris"));
+
+  /* -------------------------------------------------------
+     HARD SILENCE FOR MODERATORS
+     (Bot speaks ONLY if moderator tags it)
+  ------------------------------------------------------- */
   if (authorIsModerator) {
-    // update last moderator activity
     lastModeratorMessageAt[channelId] = now;
 
-    // if moderator replies and there was a pending question, cancel it (mod handled)
     const pending = pendingQuestionByChannel[channelId];
-    if (pending) {
-      // moderator has replied after user question => cancel pending and clear timer
-      if (pending.timer) clearTimeout(pending.timer);
-      pendingQuestionByChannel[channelId] = null;
-      // do not reply from bot since moderator handled it
-      return;
-    }
+    if (pending && pending.timer) clearTimeout(pending.timer);
+    pendingQuestionByChannel[channelId] = null;
 
-    // if moderator is summoning the bot explicitly, allow normal processing below
-    if (!moderatorSummon) {
-      // per request, keep entirely silent when moderator talks (no bot reply)
-      return;
-    }
-    // else continue and treat as summon (fallthrough)
+    if (!explicitlySummoned) return;
   }
 
   try {
-    const rawUserMessage = msg.content.trim();
-    // Quick ignore of non-text or empty
     if (!rawUserMessage) return;
 
-    // Question intent detection
     const lower = rawUserMessage.toLowerCase();
-    const isAddressingBot = moderatorSummon || lower.includes("scholaris") || lower.startsWith("scholaris");
-    const isQuestion =
-      rawUserMessage.trim().endsWith("?") ||
-      /\b(what|why|how|when|where|is|are|do|does|can|could|should|help|explain|difference|compare)\b/i.test(rawUserMessage);
+    const isAddressingBot =
+      explicitlySummoned ||
+      lower.includes("scholaris") ||
+      lower.startsWith("scholaris");
 
-    // If message neither addresses bot nor looks like a question, do not reply
+    const isQuestion =
+      rawUserMessage.endsWith("?") ||
+      /\b(what|why|how|when|where|is|are|do|does|can|could|should|help|explain|difference|compare)\b/i.test(
+        rawUserMessage
+      );
+
     if (!isAddressingBot && !isQuestion) return;
 
-    // If message explicitly summons bot (by moderator or user) -> reply immediately
-    if (isAddressingBot) {
-      // normal full flow below (immediate reply)
-    } else {
-      // is a detected question from user without explicit summon
-      // If a moderator was active recently in this channel (< 5 minutes),
-      // we should wait up to remaining time for the moderator to reply.
+    // If normal user asks but moderator recently active → wait 1 minute
+    if (!isAddressingBot) {
       const modLast = lastModeratorMessageAt[channelId] || 0;
-      const fiveMins = 5 * 60 * 1000;
+      const oneMinute = 1 * 60 * 1000;
 
-      if (modLast && (now - modLast) < fiveMins) {
-        // Moderator was recently active. We will:
-        // 1) send a polite single-line and
-        // 2) create a pendingQuestion that will auto-answer if moderator doesn't reply within remaining time
+      if (modLast && now - modLast < oneMinute) {
 
-        // If there's already a pending question, do nothing (avoid duplicates)
-        if (pendingQuestionByChannel[channelId]) {
-          // already waiting for moderator; do not requeue
-          return;
-        }
+        if (pendingQuestionByChannel[channelId]) return;
 
-        // polite single-line
-        await msg.reply("A moderator is handling your query sir. I’ll stay silent now.");
+        await msg.reply("A moderator is handling your query sir. I’ll stay silent for a minute.");
 
-        // prepare pending question for auto-answer after remaining time if moderator doesn't reply
-        const remaining = fiveMins - (now - modLast);
+        const remaining = oneMinute - (now - modLast);
 
-        // assemble minimal info to answer later
         const userQuery = preprocess(rawUserMessage);
         const detectedTopic = topics.detectTopic(userQuery);
         const mood = moodService.detectMood(userQuery);
         const toneInstruction = moodService.professionalTone(mood);
 
-        // precompute some items now to save time later
         const tox = await toxic.check(userQuery);
         const policies = inspector.inspect(userQuery);
         const ragResult = await rag.generateResponse(msg.author.id, userQuery, detectedTopic);
@@ -355,42 +342,37 @@ client.on("messageCreate", async (msg: Message) => {
           policies,
           ragAnswer: ragResult.answer,
           modelReason: "moderator-wait-fallback",
-          createdAt: now,
-          timer: undefined
+          createdAt: now
         };
 
-        // schedule a timer to auto-respond if no moderator reply
         pq.timer = setTimeout(async () => {
-          // if moderator replied in the meantime, pendingQuestionByChannel will have been cleared
           const stillPending = pendingQuestionByChannel[channelId];
           if (!stillPending) return;
 
-          // build final prompt and choose model
           const model = chooseModel(userQuery, false);
+
           const finalPrompt = `
 User Query: ${userQuery}
 Detected Topic: ${detectedTopic}
-Tone Instruction: ${toneInstruction}
+Tone: ${toneInstruction}
 
-PropScholar KB Answer:
+KB:
 ${pq.ragAnswer}
 
-Policies Triggered: ${pq.policies.join(", ") || "none"}
-Toxic Flags: ${pq.tox.join(", ") || "none"}
+Policies: ${pq.policies.join(", ") || "none"}
+Toxic: ${pq.tox.join(", ") || "none"}
 
-Note: Moderator did not reply within 5 minutes so bot is answering.
+Note: Moderator did not reply within 1 minute.
 `;
 
           const finalText = await askFinalLLM(finalPrompt, model);
-          // reply in channel
+
           try {
             const ch = msg.channel as TextChannel;
             await ch.send(finalText);
-            // store in memory
+
             await memory.addShortTerm(pq.userId, `User: ${pq.userQuery}`);
             await memory.addShortTerm(pq.userId, `Bot: ${finalText}`);
-          } catch (e) {
-            console.error("Failed to send queued bot reply:", e);
           } finally {
             pendingQuestionByChannel[channelId] = null;
           }
@@ -399,10 +381,12 @@ Note: Moderator did not reply within 5 minutes so bot is answering.
         pendingQuestionByChannel[channelId] = pq;
         return;
       }
-      // else moderator not active recently -> proceed to answer immediately
     }
 
-    // ------------- NORMAL ANSWER FLOW (immediate) -------------
+    /* -------------------------------------------------------
+       IMMEDIATE ANSWER FLOW
+    ------------------------------------------------------- */
+
     const userQuery = preprocess(rawUserMessage);
     const userId = msg.author.id;
     const detectedTopic = topics.detectTopic(userQuery);
@@ -411,46 +395,40 @@ Note: Moderator did not reply within 5 minutes so bot is answering.
 
     const tox = await toxic.check(userQuery);
     const policies = inspector.inspect(userQuery);
-
     const ragResult = await rag.generateResponse(userId, userQuery, detectedTopic);
 
-    // decide model
-    const model = chooseModel(userQuery, moderatorSummon);
+    const model = chooseModel(userQuery, isAddressingBot);
 
     const finalPrompt = `
 User Query: ${userQuery}
 Detected Topic: ${detectedTopic}
-Detected Mood: ${mood}
-Tone Instruction: ${toneInstruction}
+Mood: ${mood}
+Tone: ${toneInstruction}
 
-PropScholar KB Answer:
+KB:
 ${ragResult.answer}
 
-Policies Triggered: ${policies.join(", ") || "none"}
-Toxic Flags: ${tox.join(", ") || "none"}
-
-Your job:
-- Use KB truth.
-- Expand intelligently.
-- Follow Tone Instruction.
-- Never invent new PropScholar rules.
-- If KB is empty -> fallback message.
+Policies: ${policies.join(", ") || "none"}
+Toxic: ${tox.join(", ") || "none"}
 `;
 
     const finalText = await askFinalLLM(finalPrompt, model);
+
     await msg.reply(finalText);
 
     await memory.addShortTerm(userId, `User: ${userQuery}`);
     await memory.addShortTerm(userId, `Bot: ${finalText}`);
 
-  } catch (err) {
-    console.error("FULL BOT ERROR:", err);
-    try { await msg.reply("Internal AI error. Try again."); } catch (e) {}
+  } catch (e) {
+    console.error("FULL BOT ERROR:", e);
+    try {
+      await msg.reply("Internal AI error. Try again.");
+    } catch {}
   }
 });
 
 /* -------------------------------------------------------
-   LOGIN + SERVER
+   SERVER + LOGIN
 ------------------------------------------------------- */
 client.login(process.env.DISCORD_TOKEN);
 
