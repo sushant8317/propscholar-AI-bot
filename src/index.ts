@@ -12,7 +12,7 @@ import OpenAI from "openai";
 dotenv.config();
 
 /* -------------------------------------------------------
-   FUZZY TYPO CORRECTION + SLANG NORMALIZATION
+   FUZZY TYPO + SLANG NORMALIZATION
 ------------------------------------------------------- */
 
 function levenshtein(a: string, b: string): number {
@@ -184,7 +184,7 @@ mongoose
   .catch((err) => console.error("MongoDB error:", err));
 
 /* -------------------------------------------------------
-   ASK FINAL LLM (AI-ENRICHED + TONE ENGINE)
+   ASK FINAL LLM
 ------------------------------------------------------- */
 
 async function askFinalLLM(prompt: string): Promise<string> {
@@ -199,13 +199,12 @@ async function askFinalLLM(prompt: string): Promise<string> {
           content: `
 You are Scholaris AI — PropScholar's official support assistant.
 
-Follow these rules:
+Rules:
 - Use PropScholar KB as factual base.
-- Expand the KB answer intelligently with clarification & reasoning.
-- Follow the Tone Instruction strictly.
-- Do NOT invent new PropScholar rules.
+- Expand answers with intelligent clarification.
+- Follow tone instructions strictly.
 - No emojis.
-- If KB has no info, respond:
+- If KB has no info:
 "I don’t have much information regarding this. Let Harris or Sikha come in, they will reply in a better way sir. Until then please have patience."
 `
         },
@@ -240,6 +239,20 @@ client.on("clientReady", () => console.log("🤖 Discord bot ready!"));
 
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
+
+  /* ----- MODERATOR IGNORE SYSTEM ----- */
+  const moderators = ["harris_ps", "sikhaps", "harris", "sikha", "ps_admin"];
+  const username = msg.author.username.toLowerCase();
+
+  const isModerator = moderators.some(m => username.includes(m));
+  const mentionedScholaris =
+    msg.content.toLowerCase().includes("@scholaris") ||
+    msg.content.toLowerCase().includes("scholaris:");
+
+  if (isModerator && !mentionedScholaris) {
+    console.log("⛔ Moderator message ignored:", msg.content);
+    return;
+  }
 
   try {
     let userQuery = preprocess(msg.content.trim());
@@ -307,12 +320,14 @@ app.get("/", (req, res) => {
 });
 
 /* -------------------------------------------------------
-   SERVER START
+   START SERVER
 ------------------------------------------------------- */
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));
 
 if (process.env.INGEST_ON_STARTUP === "true") {
-  import("./scripts/ingest-data").then(() => console.log("📥 KB Ingest complete"));
+  import("./scripts/ingest-data").then(() =>
+    console.log("📥 KB Ingest complete")
+  );
 }
