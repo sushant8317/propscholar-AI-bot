@@ -21,15 +21,9 @@ export class RAGService {
   private memory = new MemoryService();
   private topics = new TopicService();
 
-  // MORE TOLERANT = more accurate retrieval
   private HALLUCINATION_THRESHOLD = 0.25;
-
-  // Search more docs → re-rank them
   private TOP_K = 12;
 
-  /* ----------------------------------------------------
-     ADVANCED QUERY EXPANSION (v2.5)
-  ---------------------------------------------------- */
   private expandQuery(q: string): string[] {
     const base = q.toLowerCase();
     const res = [base];
@@ -43,49 +37,44 @@ export class RAGService {
         "instant funding",
         "one step",
         "no news rules",
-        "no consistency rules",
+        "no consistency rules"
       ],
-
       daily: [
         "daily dd",
         "daily drawdown",
         "maximum daily loss",
         "daily limit",
         "dmax",
-        "dd",
+        "dd"
       ],
-
       payout: [
         "withdraw",
         "withdrawal",
         "payout schedule",
         "profit split",
-        "payouts",
+        "payouts"
       ],
-
       ufm: [
         "unfair means",
         "unfair practices",
         "tick scalping",
         "signal trading",
         "copying signals",
-        "exploitation",
+        "exploitation"
       ],
-
       drawdown: [
         "dd",
         "maximum loss",
         "loss limit",
         "risk limit",
-        "overall drawdown",
+        "overall drawdown"
       ],
-
       rules: [
         "evaluation rules",
         "prop rules",
         "firm rules",
-        "eligibility rules",
-      ],
+        "eligibility rules"
+      ]
     };
 
     for (const key in synonyms) {
@@ -95,29 +84,22 @@ export class RAGService {
     return Array.from(new Set(res));
   }
 
-  /* ----------------------------------------------------
-     TOPIC-AWARE RE-RANKING (boost accuracy massively)
-  ---------------------------------------------------- */
   private rerankByTopic(docs: KBDoc[], topic: string): KBDoc[] {
     if (!topic || topic === "general") return docs;
 
-    return docs.map((d) => {
+    return docs.map(d => {
       const cat = (d.metadata?.category || "").toLowerCase();
       let boost = 0;
 
-      // Partial match is enough
       if (cat.includes(topic.toLowerCase())) boost += 0.4;
 
-      return {
-        ...d,
-        score: (d.score || 0) + boost,
-      };
+      return { ...d, score: (d.score || 0) + boost };
     });
   }
 
   private computeConfidence(docs: KBDoc[]): number {
     if (docs.length === 0) return 0;
-    const max = Math.max(...docs.map((d) => d.score || 0));
+    const max = Math.max(...docs.map(d => d.score || 0));
     if (max <= 0) return 0;
     return Number(Math.min(1, max).toFixed(2));
   }
@@ -134,56 +116,45 @@ export class RAGService {
     }
   }
 
-  /* ----------------------------------------------------
-     MAIN FUNCTION
-  ---------------------------------------------------- */
   async generateResponse(userId: string, query: string, topic: string) {
     const mem = await this.memory.getMemory(userId);
 
-    const shortTerm =
-      mem.shortTerm?.map((m: any) => m.text).join(" | ") || "none";
+    const shortTerm = mem.shortTerm?.map((m: any) => m.text).join(" | ") || "none";
+    const longTerm = mem.longTerm?.map((m: any) => m.text).join(" | ") || "none";
 
-    const longTerm =
-      mem.longTerm?.map((m: any) => m.text).join(" | ") || "none";
-
-    /* --------- SMART QUERY EXPANSION ---------- */
     const expanded = this.expandQuery(query).join(" ");
     const queryEmbedding = await EmbedText(expanded);
 
-    /* --------- VECTOR SEARCH ---------- */
-    const raw = await this.vector.findSimilar(
-      queryEmbedding,
-      this.TOP_K,
-      0.18 // slightly lower threshold for better recall
-    );
+    const raw = await this.vector.findSimilar(queryEmbedding, this.TOP_K, 0.18);
 
-    const docs: KBDoc[] =
-      raw?.map((r: any) => ({
-        _id: r._id,
-        content: r.content,
-        embedding: r.embedding,
-        metadata: r.metadata,
-        score: r.score,
-      })) || [];
+    const docs: KBDoc[] = raw?.map((r: any) => ({
+      _id: r._id,
+      content: r.content,
+      embedding: r.embedding,
+      metadata: r.metadata,
+      score: r.score
+    })) || [];
 
-    /* --------- TOPIC-AWARE RE-RANK ---------- */
     const ranked = this.rerankByTopic(docs, topic);
     const confidence = this.computeConfidence(ranked);
 
-    /* --------- FALLBACK ON LOW CONFIDENCE ---------- */
+    // ---------------------------------------------------------
+    // NEW FALLBACK MESSAGE
+    // ---------------------------------------------------------
     if (ranked.length === 0 || confidence < this.HALLUCINATION_THRESHOLD) {
       await this.memory.addShortTerm(userId, `User: ${query}`);
+
       return {
-        answer: "I cannot find this in PropScholar’s knowledge base yet.",
+        answer:
+          "I don’t have much information regarding this. Let Harris or Sikha come in, they will reply in a better way sir. Until then please have patience.",
         confidence,
-        usedDocs: [],
+        usedDocs: []
       };
     }
 
-    /* --------- IMPROVED KB CONTEXT (8 docs) ---------- */
     const kbContext = ranked
       .slice(0, 8)
-      .map((d) => `${d.metadata?.title || ""}\n${d.content}\n---\n`)
+      .map(d => `${d.metadata?.title || ""}\n${d.content}\n---\n`)
       .join("\n")
       .slice(0, 3500);
 
@@ -217,10 +188,10 @@ ${kbContext}
         model: "gpt-4.1-mini",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: userMsg },
+          { role: "user", content: userMsg }
         ],
         max_tokens: 700,
-        temperature: 0.0,
+        temperature: 0.0
       });
 
       rawText = completion.choices?.[0]?.message?.content || null;
@@ -229,7 +200,7 @@ ${kbContext}
       return {
         answer: "Internal LLM error.",
         confidence,
-        usedDocs: [],
+        usedDocs: []
       };
     }
 
@@ -238,7 +209,7 @@ ${kbContext}
     const finalAnswer =
       parsed?.answer ||
       rawText ||
-      "I cannot find this in the PropScholar knowledge base.";
+      "I don’t have much information regarding this. Let Harris or Sikha come in, they will reply in a better way sir. Until then please have patience.";
 
     await this.memory.addShortTerm(userId, `User: ${query}`);
     await this.memory.addShortTerm(userId, `Bot: ${finalAnswer}`);
@@ -246,7 +217,7 @@ ${kbContext}
     return {
       answer: finalAnswer,
       confidence,
-      usedDocs: ranked.slice(0, 8),
+      usedDocs: ranked.slice(0, 8)
     };
   }
 }
