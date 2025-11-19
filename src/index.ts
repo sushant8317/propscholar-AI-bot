@@ -195,7 +195,7 @@ const client = new Client({
   ],
 });
 
-client.on("ready", () => console.log("🤖 Discord bot ready!"));
+client.on("clientReady", () => console.log("🤖 Discord bot ready!"));
 
 /* -------------------------------------------------------
    MESSAGE HANDLER
