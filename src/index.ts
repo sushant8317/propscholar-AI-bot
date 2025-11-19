@@ -10,7 +10,7 @@ import OpenAI from "openai";
 dotenv.config();
 
 /* -------------------------------------------------------
-   FUZZY TYPO CORRECTION + SLANG NORMALIZATION
+   FUZZY TYPO + SLANG NORMALIZATION
 ------------------------------------------------------- */
 
 function levenshtein(a: string, b: string): number {
@@ -80,7 +80,7 @@ function preprocess(text: string) {
 }
 
 /* -------------------------------------------------------
-   MOOD & PROFESSIONAL TONE ENGINE
+   MOOD + PROFESSIONAL TONE ENGINE
 ------------------------------------------------------- */
 
 class MoodService {
@@ -184,7 +184,7 @@ mongoose
 
 function chooseModel(query: string, moderatorSummon: boolean): "gpt-4.1" | "gpt-4.1-mini" {
 
-  if (moderatorSummon) return "gpt-4.1";
+  if (moderatorSummon) return "gpt-4.1";  
 
   if (query.length < 8) return "gpt-4.1-mini";
 
@@ -244,8 +244,9 @@ const client = new Client({
 
 client.on("clientReady", () => console.log("🤖 Discord bot ready!"));
 
+
 /* -------------------------------------------------------
-   MESSAGE HANDLER
+   MESSAGE HANDLER (WITH MODERATOR SILENT MODE)
 ------------------------------------------------------- */
 
 client.on("messageCreate", async (msg) => {
@@ -257,7 +258,11 @@ client.on("messageCreate", async (msg) => {
 
   const moderatorSummon = msg.content.includes("@Scholaris");
 
-  if (isModerator && !moderatorSummon) return;
+  // NEW RULE: If moderator talks (WITHOUT tagging), AI stays silent politely
+  if (isModerator && !moderatorSummon) {
+    await msg.reply("A moderator is handling your query sir. I’ll stay silent now.");
+    return;
+  }
 
   try {
     const rawText = msg.content.trim();
