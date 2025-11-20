@@ -254,6 +254,34 @@ client.on("messageCreate", async (msg) => {
   // silent mode
   if (isModerator && !botTagged) return;
 
+
+       // Wait 1 minute before replying - cancel if moderator replies first
+  let modReplied = false;
+  const messageCollector = msg.channel.createMessageCollector({
+    time: 60000, // 1 minute
+    filter: (m) => {
+      const isModReply = m.member?.roles.cache.some(role => 
+        role.name.toLowerCase().includes('mod') || 
+        role.name.toLowerCase().includes('moderator')
+      );
+      if (isModReply && !m.author.bot) {
+        modReplied = true;
+        messageCollector.stop();
+        return true;
+      }
+      return false;
+    }
+  });
+
+  await new Promise(resolve => {
+    messageCollector.on('end', resolve);
+  });
+
+  // If moderator replied, don't send bot response
+  if (modReplied) {
+    console.log('⏭️ Moderator replied, skipping bot response');
+    return;
+  }
   // typing indicator
   msg.channel.sendTyping();
   const typingLoop = setInterval(() => msg.channel.sendTyping(), 3500);
