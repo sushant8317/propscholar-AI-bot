@@ -242,8 +242,8 @@ const client = new Client({
   ]
 });
 
-client.on("clientReady", () => console.log("🤖 Discord bot ready!"));
-
+// correct ready event
+client.on("ready", () => console.log("🤖 Discord bot ready!"));
 
 /* -------------------------------------------------------
    MESSAGE HANDLER (MOD SILENT MODE)
@@ -256,9 +256,15 @@ client.on("messageCreate", async (msg) => {
     ["Moderator", "Admin", "Staff"].includes(r.name)
   );
 
-  // Bot only replies if tagged by moderator
-  const botTagged = msg.mentions.users.has(client.user?.id || "");
+  const botId = client.user?.id || "";
 
+  // TRUE only if bot is directly and explicitly tagged
+  const botTagged =
+    (botId &&
+      (msg.mentions.users.has(botId) ||
+        msg.content.includes(`<@${botId}>`) ||
+        msg.content.includes(`<@!${botId}>`))) ||
+    false;
 
   // Moderator message WITHOUT tagging bot → IGNORE COMPLETELY
   if (isModerator && !botTagged) return;
@@ -309,16 +315,26 @@ Respond using KB + tone.
 
     const finalText = await askFinalLLM(finalPrompt, model);
 
-    clearInterval(typingLoop);
     await msg.reply(finalText);
 
-    await memory.addShortTerm(userId, `User: ${userQuery}`);
-    await memory.addShortTerm(userId, `Bot: ${finalText}`);
+    // protect memory ops so missing docs won't crash the bot
+    try {
+      await memory.addShortTerm(userId, `User: ${userQuery}`);
+    } catch (e) {
+      console.error("MEMORY shortTerm add user error:", e);
+    }
+
+    try {
+      await memory.addShortTerm(userId, `Bot: ${finalText}`);
+    } catch (e) {
+      console.error("MEMORY shortTerm add bot error:", e);
+    }
 
   } catch (err) {
     console.error("FULL BOT ERROR:", err);
-    clearInterval(typingLoop);
     msg.reply("Internal AI error. Try again.");
+  } finally {
+    clearInterval(typingLoop);
   }
 });
 
