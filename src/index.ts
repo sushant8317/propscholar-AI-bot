@@ -238,12 +238,12 @@ client.on("ready", () => console.log("🤖 Discord ready!"));
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
 
-// Discord User IDs for Sikha Moderator and Harris Moderator
-  const MODERATOR_IDS = ['sikhaps', 'harris_ps'];
-  
-  // Check if message author is one of the specified moderators
-  const isModerator = MODERATOR_IDS.includes(msg.author.id);
-  const botId = client.user?.id || "";
+  // Check if user has moderator role (checks role names containing 'mod' or 'moderator')
+  const isModerator = msg.member?.roles.cache.some(role => 
+    role.name.toLowerCase().includes('mod') || 
+    role.name.toLowerCase().includes('moderator')
+  ) || false;
+     const botId = client.user?.id || "";
 
   // accurate bot mention detector
   const botTagged =
