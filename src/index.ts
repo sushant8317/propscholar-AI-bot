@@ -257,11 +257,17 @@ client.on("messageCreate", async (msg) => {
   );
 
   // Bot only replies if tagged by moderator
-  const botTagged = msg.mentions.has(client.user?.id || "");
+  const botTagged = msg.mentions.users.has(client.user?.id || "");
 
 
   // Moderator message WITHOUT tagging bot → IGNORE COMPLETELY
   if (isModerator && !botTagged) return;
+
+  // Show typing indicator immediately and keep it alive while processing
+  msg.channel.sendTyping().catch(() => {});
+  const typingLoop = setInterval(() => {
+    msg.channel.sendTyping().catch(() => {});
+  }, 4000);
 
   try {
     const rawText = msg.content.trim();
@@ -303,6 +309,7 @@ Respond using KB + tone.
 
     const finalText = await askFinalLLM(finalPrompt, model);
 
+    clearInterval(typingLoop);
     await msg.reply(finalText);
 
     await memory.addShortTerm(userId, `User: ${userQuery}`);
@@ -310,6 +317,7 @@ Respond using KB + tone.
 
   } catch (err) {
     console.error("FULL BOT ERROR:", err);
+    clearInterval(typingLoop);
     msg.reply("Internal AI error. Try again.");
   }
 });
