@@ -246,7 +246,7 @@ client.on("clientReady", () => console.log("🤖 Discord bot ready!"));
 
 
 /* -------------------------------------------------------
-   MESSAGE HANDLER (WITH MODERATOR SILENT MODE)
+   MESSAGE HANDLER (MOD SILENT MODE)
 ------------------------------------------------------- */
 
 client.on("messageCreate", async (msg) => {
@@ -256,13 +256,11 @@ client.on("messageCreate", async (msg) => {
     ["Moderator", "Admin", "Staff"].includes(r.name)
   );
 
-  const moderatorSummon = msg.content.includes("@Scholaris");
+  // Bot only replies if tagged by moderator
+  const botTagged = msg.mentions.has(client.user);
 
-  // NEW RULE: If moderator talks (WITHOUT tagging), AI stays silent politely
-  if (isModerator && !moderatorSummon) {
-    await msg.reply("A moderator is handling your query sir. I’ll stay silent now.");
-    return;
-  }
+  // Moderator message WITHOUT tagging bot → IGNORE COMPLETELY
+  if (isModerator && !botTagged) return;
 
   try {
     const rawText = msg.content.trim();
@@ -282,13 +280,13 @@ client.on("messageCreate", async (msg) => {
       [...tox, ...policies]
     );
 
-    const model = chooseModel(userQuery, moderatorSummon);
+    const model = chooseModel(userQuery, botTagged);
 
     const finalPrompt = `
 User Query: ${userQuery}
 Rewritten Query: ${rewritten.answer}
 
-Moderator Summon: ${moderatorSummon}
+Moderator Summon: ${botTagged}
 Detected Topic: ${detectedTopic}
 Mood: ${mood}
 Tone Instruction: ${toneInstruction}
