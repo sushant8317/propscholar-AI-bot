@@ -117,7 +117,7 @@ class MoodService {
 const moodService = new MoodService();
 
 /* -------------------------------------------------------
-   ROUTERS + SERVICES
+   ROUTERS + EXISTING SERVICES
 ------------------------------------------------------- */
 
 import { router as adminRouter } from "./controllers/admin.controller";
@@ -136,6 +136,22 @@ const inspector = new PolicyInspectorService();
 const scholaris = new ScholarisService();
 const memory = new MemoryService();
 const topics = new TopicService();
+
+/* -------------------------------------------------------
+   NEW SERVICES (5)
+------------------------------------------------------- */
+
+import { IntentService } from "./services/intent.service";
+import { AnalyticsService } from "./services/analytics.service";
+import { CacheService } from "./services/cache.service";
+import { RateLimitService } from "./services/rateLimit.service";
+import { ContextService } from "./services/context.service";
+
+const intentService = new IntentService();
+const analytics = new AnalyticsService();
+const cache = new CacheService();
+const rateLimit = new RateLimitService();
+const contextManager = new ContextService();
 
 /* -------------------------------------------------------
    OPENAI
@@ -218,7 +234,7 @@ If KB empty: "I don’t have much information regarding this. Let Harris or Sikh
 }
 
 /* -------------------------------------------------------
-   DISCORD
+   DISCORD CLIENT
 ------------------------------------------------------- */
 
 const client = new Client({
@@ -232,65 +248,124 @@ const client = new Client({
 client.on("ready", () => console.log("🤖 Discord ready!"));
 
 /* -------------------------------------------------------
-   MESSAGE HANDLER
+   UPGRADED MESSAGE HANDLER
 ------------------------------------------------------- */
 
 client.on("messageCreate", async (msg) => {
   if (msg.author.bot) return;
 
-  // Check if user has moderator role (checks role names containing 'mod' or 'moderator')
-  const isModerator = msg.member?.roles.cache.some(role => 
-    role.name.toLowerCase().includes('mod') || 
-    role.name.toLowerCase().includes('moderator')
-  ) || false;
-     const botId = client.user?.id || "";
+  const startTime = Date.now();
+  const userId = msg.author.id;
+  const botId = client.user?.id || "";
 
-  // accurate bot mention detector
+  // Moderator check
+  const isModerator =
+    msg.member?.roles.cache.some(r =>
+      r.name.toLowerCase().includes("mod") || r.name.toLowerCase().includes("moderator")
+    ) || false;
+
+  // Detect if bot was tagged
   const botTagged =
     msg.mentions.users.has(botId) ||
     msg.content.includes(`<@${botId}>`) ||
     msg.content.includes(`<@!${botId}>`);
 
-  // silent mode
+  // Silent mode
   if (isModerator && !botTagged) return;
 
+  /* -------------------------------------------------------
+     RATE LIMIT
+  ------------------------------------------------------- */
+  const rateCheck = rateLimit.check(userId, msg.content.trim());
 
-       // Wait 1 minute before replying - cancel if moderator replies first
+  if (!rateCheck.allow) {
+    return msg.reply("⏰ Please wait 10 seconds before asking another question!");
+  }
+
+  if (rateCheck.shouldSummarize) {
+    await msg.channel.send(
+      `I notice you've asked several related questions:\n${rateCheck.prev
+        .map((q, i) => `${i + 1}. ${q}`)
+        .join("\n")}\n\nLet me provide a comprehensive answer...`
+    );
+    rateLimit.clear(userId);
+  }
+
+  /* -------------------------------------------------------
+     MODERATOR WAIT
+  ------------------------------------------------------- */
   let modReplied = false;
-  const messageCollector = msg.channel.createMessageCollector({
-    time: 60000, // 1 minute
+
+  const collector = msg.channel.createMessageCollector({
+    time: 60000,
     filter: (m) => {
-      const isModReply = m.member?.roles.cache.some(role => 
-        role.name.toLowerCase().includes('mod') || 
-        role.name.toLowerCase().includes('moderator')
-      );
-      if (isModReply && !m.author.bot) {
+      const isMod =
+        m.member?.roles.cache.some(r =>
+          r.name.toLowerCase().includes("mod")
+        ) || false;
+
+      if (isMod && !m.author.bot) {
         modReplied = true;
-        messageCollector.stop();
+        collector.stop();
         return true;
       }
       return false;
     }
   });
 
-  await new Promise(resolve => {
-    messageCollector.on('end', resolve);
-  });
+  await new Promise(resolve => collector.on("end", resolve));
 
-  // If moderator replied, don't send bot response
   if (modReplied) {
-    console.log('⏭️ Moderator replied, skipping bot response');
+    console.log("⏭️ Moderator replied, skipping bot");
     return;
   }
-  // typing indicator
+
+  /* -------------------------------------------------------
+     START TYPING LOOP
+  ------------------------------------------------------- */
   msg.channel.sendTyping();
   const typingLoop = setInterval(() => msg.channel.sendTyping(), 3500);
 
   try {
     const raw = msg.content.trim();
     const userQuery = preprocess(raw);
-    const userId = msg.author.id;
 
+    /* -------------------------------------------------------
+       INTENT DETECTION
+    ------------------------------------------------------- */
+    const intent = intentService.detectIntent(userQuery);
+    const quick = intentService.getQuickResponse(intent.intent);
+
+    if (quick && !botTagged) {
+      await msg.channel.send(quick);
+      return;
+    }
+
+    /* -------------------------------------------------------
+       CACHE CHECK
+    ------------------------------------------------------- */
+    const cached = cache.get(userQuery);
+    if (cached && !botTagged) {
+      await msg.channel.send(cached);
+      await analytics.log({
+        userId,
+        query: userQuery,
+        intent: intent.intent,
+        cached: true,
+        modelUsed: "cache",
+        responseTime: Date.now() - startTime
+      });
+      return;
+    }
+
+    /* -------------------------------------------------------
+       CONTEXT
+    ------------------------------------------------------- */
+    const context = contextManager.get(userId);
+
+    /* -------------------------------------------------------
+       EXISTING PIPELINE (RAG + REWRITE + POLICIES)
+    ------------------------------------------------------- */
     const topic = topics.detectTopic(userQuery);
     const mood = moodService.detectMood(userQuery);
     const tone = moodService.professionalTone(mood);
@@ -298,7 +373,6 @@ client.on("messageCreate", async (msg) => {
     const tox = await toxic.check(userQuery);
     const ragResult = await rag.generateResponse(userId, userQuery, topic);
     const policies = inspector.inspect(userQuery);
-
     const rewritten = await scholaris.regenerateWithConstraints(
       userQuery,
       [...tox, ...policies]
@@ -307,9 +381,11 @@ client.on("messageCreate", async (msg) => {
     const model = chooseModel(userQuery, botTagged);
 
     const finalPrompt = `
+${context}
+
 User Query: ${userQuery}
 Rewritten: ${rewritten.answer}
-Moderator Tag: ${botTagged}
+Intent: ${intent.intent}
 Topic: ${topic}
 Mood: ${mood}
 Tone: ${tone}
@@ -321,22 +397,35 @@ Policies: ${policies.join(", ") || "none"}
 Toxic: ${tox.join(", ") || "none"}
 `;
 
+    /* -------------------------------------------------------
+       LLM FINAL ANSWER
+    ------------------------------------------------------- */
     const finalText = await askFinalLLM(finalPrompt, model);
 
-    // IMPORTANT: avoid reply() → use channel.send() to avoid crash
-    await msg.channel.send(finalText);
+    const response = await msg.channel.send(finalText);
 
-    // safe memory ops
+    /* -------------------------------------------------------
+       ADD TO CACHE + CONTEXT + ANALYTICS + MEMORY
+    ------------------------------------------------------- */
+    cache.set(userQuery, finalText);
+
+    contextManager.add(userId, "user", userQuery, topic);
+    contextManager.add(userId, "assistant", finalText, topic);
+
+    await analytics.log({
+      userId,
+      query: userQuery,
+      intent: intent.intent,
+      cached: false,
+      modelUsed: model,
+      responseTime: Date.now() - startTime
+    });
+
     try {
       await memory.addShortTerm(userId, `User: ${userQuery}`);
-    } catch (e) {
-      console.error("MEMORY error user:", e);
-    }
-
-    try {
       await memory.addShortTerm(userId, `Bot: ${finalText}`);
     } catch (e) {
-      console.error("MEMORY error bot:", e);
+      console.error("MEMORY error:", e);
     }
 
   } catch (err) {
@@ -348,22 +437,14 @@ Toxic: ${tox.join(", ") || "none"}
 });
 
 /* -------------------------------------------------------
-   LOGIN
+   LOGIN + EXPRESS ROOT
 ------------------------------------------------------- */
 
 client.login(process.env.DISCORD_TOKEN);
 
-/* -------------------------------------------------------
-   EXPRESS ROOT
-------------------------------------------------------- */
-
 app.get("/", (req, res) => {
   res.send("PropScholar AI Bot Running");
 });
-
-/* -------------------------------------------------------
-   START
-------------------------------------------------------- */
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));
