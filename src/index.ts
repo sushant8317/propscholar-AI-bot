@@ -80,7 +80,7 @@ function preprocess(text: string) {
 }
 
 /* -------------------------------------------------------
-   MOOD + PROFESSIONAL TONE ENGINE
+   MOOD ENGINE
 ------------------------------------------------------- */
 
 class MoodService {
@@ -107,9 +107,9 @@ class MoodService {
       case "positive":
         return "Stay professional but match the energy.";
       case "confused":
-        return "Explain simply in a step-by-step way.";
+        return "Explain step-by-step.";
       default:
-        return "Use a clean professional support tone.";
+        return "Use a clean professional tone.";
     }
   }
 }
@@ -117,14 +117,12 @@ class MoodService {
 const moodService = new MoodService();
 
 /* -------------------------------------------------------
-   ROUTERS
+   ROUTERS + SERVICES
 ------------------------------------------------------- */
+
 import { router as adminRouter } from "./controllers/admin.controller";
 import { router as adminUIRouter } from "./controllers/admin-ui.controller";
 
-/* -------------------------------------------------------
-   SERVICES
-------------------------------------------------------- */
 import { RAGService } from "./services/rag.service";
 import { ToxicDetectorService } from "./services/toxicDetector.service";
 import { PolicyInspectorService } from "./services/policyInspector.service";
@@ -140,7 +138,7 @@ const memory = new MemoryService();
 const topics = new TopicService();
 
 /* -------------------------------------------------------
-   OPENAI CLIENT
+   OPENAI
 ------------------------------------------------------- */
 
 const openai = new OpenAI({
@@ -148,7 +146,7 @@ const openai = new OpenAI({
 });
 
 /* -------------------------------------------------------
-   EXPRESS APP
+   EXPRESS
 ------------------------------------------------------- */
 
 const app = express();
@@ -170,7 +168,7 @@ app.use("/admin", adminRouter);
 app.use("/admin-ui", adminUIRouter);
 
 /* -------------------------------------------------------
-   MONGODB CONNECT
+   MONGO
 ------------------------------------------------------- */
 
 mongoose
@@ -179,22 +177,18 @@ mongoose
   .catch((err) => console.error("MongoDB error:", err));
 
 /* -------------------------------------------------------
-   SMART MODEL SWITCHING
+   MODEL CHOOSER
 ------------------------------------------------------- */
 
 function chooseModel(query: string, moderatorSummon: boolean): "gpt-4.1" | "gpt-4.1-mini" {
-
-  if (moderatorSummon) return "gpt-4.1";  
-
+  if (moderatorSummon) return "gpt-4.1";
   if (query.length < 8) return "gpt-4.1-mini";
-
   if (/explain|difference|compare|why|how/.test(query)) return "gpt-4.1";
-
   return "gpt-4.1-mini";
 }
 
 /* -------------------------------------------------------
-   ASK FINAL LLM
+   LLM CALL
 ------------------------------------------------------- */
 
 async function askFinalLLM(prompt: string, model: string): Promise<string> {
@@ -208,30 +202,23 @@ async function askFinalLLM(prompt: string, model: string): Promise<string> {
           role: "system",
           content: `
 You are Scholaris AI — PropScholar's official support assistant.
-
-Rules:
-- Use KB as truth.
-- Expand with intelligent clarification.
-- Follow tone instructions.
-- NO new PropScholar rules.
-- No emojis.
-- If KB is empty, say:
-"I don’t have much information regarding this. Let Harris or Sikha come in, they will reply in a better way sir. Until then please have patience."
+Use KB only. No emojis.
+If KB empty: "I don’t have much information regarding this. Let Harris or Sikha come in…"
 `
         },
         { role: "user", content: prompt }
       ]
     });
 
-    return completion.choices[0].message?.content || "Error generating response.";
-  } catch (err: any) {
-    console.error("GPT ERROR:", err.response?.data || err.message);
+    return completion.choices[0].message?.content || "AI error.";
+  } catch (err) {
+    console.error("GPT ERROR:", err);
     return "Internal AI error.";
   }
 }
 
 /* -------------------------------------------------------
-   DISCORD BOT
+   DISCORD
 ------------------------------------------------------- */
 
 const client = new Client({
@@ -242,11 +229,10 @@ const client = new Client({
   ]
 });
 
-// correct ready event
-client.on("ready", () => console.log("🤖 Discord bot ready!"));
+client.on("ready", () => console.log("🤖 Discord ready!"));
 
 /* -------------------------------------------------------
-   MESSAGE HANDLER (MOD SILENT MODE)
+   MESSAGE HANDLER
 ------------------------------------------------------- */
 
 client.on("messageCreate", async (msg) => {
@@ -258,34 +244,30 @@ client.on("messageCreate", async (msg) => {
 
   const botId = client.user?.id || "";
 
-  // TRUE only if bot is directly and explicitly tagged
+  // accurate bot mention detector
   const botTagged =
-    (botId &&
-      (msg.mentions.users.has(botId) ||
-        msg.content.includes(`<@${botId}>`) ||
-        msg.content.includes(`<@!${botId}>`))) ||
-    false;
+    msg.mentions.users.has(botId) ||
+    msg.content.includes(`<@${botId}>`) ||
+    msg.content.includes(`<@!${botId}>`);
 
-  // Moderator message WITHOUT tagging bot → IGNORE COMPLETELY
+  // silent mode
   if (isModerator && !botTagged) return;
 
-  // Show typing indicator immediately and keep it alive while processing
-  msg.channel.sendTyping().catch(() => {});
-  const typingLoop = setInterval(() => {
-    msg.channel.sendTyping().catch(() => {});
-  }, 4000);
+  // typing indicator
+  msg.channel.sendTyping();
+  const typingLoop = setInterval(() => msg.channel.sendTyping(), 3500);
 
   try {
-    const rawText = msg.content.trim();
-    let userQuery = preprocess(rawText);
+    const raw = msg.content.trim();
+    const userQuery = preprocess(raw);
     const userId = msg.author.id;
 
-    const detectedTopic = topics.detectTopic(userQuery);
+    const topic = topics.detectTopic(userQuery);
     const mood = moodService.detectMood(userQuery);
-    const toneInstruction = moodService.professionalTone(mood);
+    const tone = moodService.professionalTone(mood);
 
     const tox = await toxic.check(userQuery);
-    const ragResult = await rag.generateResponse(userId, userQuery, detectedTopic);
+    const ragResult = await rag.generateResponse(userId, userQuery, topic);
     const policies = inspector.inspect(userQuery);
 
     const rewritten = await scholaris.regenerateWithConstraints(
@@ -297,55 +279,53 @@ client.on("messageCreate", async (msg) => {
 
     const finalPrompt = `
 User Query: ${userQuery}
-Rewritten Query: ${rewritten.answer}
-
-Moderator Summon: ${botTagged}
-Detected Topic: ${detectedTopic}
+Rewritten: ${rewritten.answer}
+Moderator Tag: ${botTagged}
+Topic: ${topic}
 Mood: ${mood}
-Tone Instruction: ${toneInstruction}
+Tone: ${tone}
 
-KB Answer:
+KB:
 ${ragResult.answer}
 
 Policies: ${policies.join(", ") || "none"}
-Toxic Flags: ${tox.join(", ") || "none"}
-
-Respond using KB + tone.
+Toxic: ${tox.join(", ") || "none"}
 `;
 
     const finalText = await askFinalLLM(finalPrompt, model);
 
-    await msg.reply(finalText);
+    // IMPORTANT: avoid reply() → use channel.send() to avoid crash
+    await msg.channel.send(finalText);
 
-    // protect memory ops so missing docs won't crash the bot
+    // safe memory ops
     try {
       await memory.addShortTerm(userId, `User: ${userQuery}`);
     } catch (e) {
-      console.error("MEMORY shortTerm add user error:", e);
+      console.error("MEMORY error user:", e);
     }
 
     try {
       await memory.addShortTerm(userId, `Bot: ${finalText}`);
     } catch (e) {
-      console.error("MEMORY shortTerm add bot error:", e);
+      console.error("MEMORY error bot:", e);
     }
 
   } catch (err) {
-    console.error("FULL BOT ERROR:", err);
-    msg.reply("Internal AI error. Try again.");
+    console.error("BOT ERROR:", err);
+    msg.channel.send("Internal AI error.");
   } finally {
     clearInterval(typingLoop);
   }
 });
 
 /* -------------------------------------------------------
-   LOGIN TO DISCORD
+   LOGIN
 ------------------------------------------------------- */
 
 client.login(process.env.DISCORD_TOKEN);
 
 /* -------------------------------------------------------
-   ROOT PAGE
+   EXPRESS ROOT
 ------------------------------------------------------- */
 
 app.get("/", (req, res) => {
@@ -353,7 +333,7 @@ app.get("/", (req, res) => {
 });
 
 /* -------------------------------------------------------
-   START SERVER
+   START
 ------------------------------------------------------- */
 
 const PORT = process.env.PORT || 3000;
@@ -361,6 +341,6 @@ app.listen(PORT, () => console.log(`Server running on ${PORT}`));
 
 if (process.env.INGEST_ON_STARTUP === "true") {
   import("./scripts/ingest-data").then(() =>
-    console.log("📥 KB Ingest complete")
+    console.log("📥 KB Ingested")
   );
 }
