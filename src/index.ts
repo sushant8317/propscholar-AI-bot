@@ -257,7 +257,8 @@ client.on("messageCreate", async (msg) => {
   );
 
   // Bot only replies if tagged by moderator
-  const botTagged = msg.mentions.has(client.user);
+  const botTagged = msg.mentions.has(client.user?.id || "");
+
 
   // Moderator message WITHOUT tagging bot → IGNORE COMPLETELY
   if (isModerator && !botTagged) return;
