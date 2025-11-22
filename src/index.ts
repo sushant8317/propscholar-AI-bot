@@ -297,7 +297,7 @@ client.on("messageCreate", async (msg) => {
   let modReplied = false;
 
   const collector = msg.channel.createMessageCollector({
-    time: 60000,
+    time: 20000,
     filter: (m) => {
       const isMod =
         m.member?.roles.cache.some(r =>
@@ -372,6 +372,12 @@ client.on("messageCreate", async (msg) => {
 
     const tox = await toxic.check(userQuery);
     const ragResult = await rag.generateResponse(userId, userQuery, topic);
+
+         // Active document highlighting & follow-up suggestions
+         let kbHighlightBlock = "";
+         if (ragResult.answer) {
+                  kbHighlightBlock = `**From Knowledge Base:**\n> ${ragResult.answer}\n\n`;
+                }
     const policies = inspector.inspect(userQuery);
     const rewritten = await scholaris.regenerateWithConstraints(
       userQuery,
@@ -391,7 +397,7 @@ Mood: ${mood}
 Tone: ${tone}
 
 KB:
-${ragResult.answer}
+${kbHighlightBlock}
 
 Policies: ${policies.join(", ") || "none"}
 Toxic: ${tox.join(", ") || "none"}
