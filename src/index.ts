@@ -309,6 +309,7 @@ client.on("messageCreate", async (msg) => {
       if (targetUser) await msg.channel.send(`${targetUser}, ${ragResp.answer}`);
       await msg.reply("✅ Answered!"); return;
     }
+            }
 
             
 
