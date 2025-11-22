@@ -270,6 +270,51 @@ client.on("messageCreate", async (msg) => {
     msg.content.includes(`<@${botId}>`) ||
     msg.content.includes(`<@!${botId}>`);
 
+       /* -------------------------------------------------------
+            MODERATOR COMMAND SYSTEM
+              ------------------------------------------------------- */
+     if (botTagged && isModerator) {
+            const content = msg.content.replace(/<@!?\d+>/g, "").trim();
+
+            // ANNOUNCE command
+            if (/^announce\s+/i.test(content)) {
+                     const text = content.replace(/^announce\s+/i, "").trim();
+                     await msg.channel.send(`📢 **ANNOUNCEMENT**\n\n${text}`);
+                     await msg.reply("✅ Announcement posted!");
+                     return;
+                   }
+
+            // REPLY command
+            const replyMatch = content.match(/^reply\s+<@!?(\d+)>\s+(.+)/i);
+            if (replyMatch) {
+                     const targetUser = await msg.guild?.members.fetch(replyMatch[1]);
+                     if (targetUser) await msg.channel.send(`${targetUser}, ${replyMatch[2]}`);
+                     await msg.reply("✅ Replied to user!"); return;
+                   }
+
+            // DM command
+    const dmMatch = content.match(/^dm\s+<@!?(\d+)>\s+(.+)/i);
+    if (dmMatch) {
+      const targetUser = await msg.guild?.members.fetch(dmMatch[1]);
+      if (targetUser) await targetUser.send(dmMatch[2]);
+      await msg.reply("✅ DM sent!"); return;
+    }
+
+    // ANSWER command
+    const answerMatch = content.match(/^answer\s+<@!?(\d+)>\s+about\s+(.+)/i);
+    if (answerMatch) {
+      const topic = answerMatch[2];
+      const ragResp = await rag.generateResponse(userId, topic, topic);
+      const targetUser = await msg.guild?.members.fetch(answerMatch[1]);
+      if (targetUser) await msg.channel.send(`${targetUser}, ${ragResp.answer}`);
+      await msg.reply("✅ Answered!"); return;
+    }
+
+            // No command matched
+    await msg.reply("❌ Unknown command. Available: `announce`, `reply`, `dm`, `answer`");
+    return;
+  }
+
   // Silent mode
   if (isModerator && !botTagged) return;
 
