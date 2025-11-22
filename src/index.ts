@@ -310,10 +310,7 @@ client.on("messageCreate", async (msg) => {
       await msg.reply("✅ Answered!"); return;
     }
 
-            // No command matched
-    await msg.reply("❌ Unknown command. Available: `announce`, `reply`, `dm`, `answer`");
-    return;
-  }
+            
 
   // Silent mode
   if (isModerator && !botTagged) return;
