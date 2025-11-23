@@ -349,8 +349,13 @@ client.on("messageCreate", async (msg) => {
 
       if (isMod && !m.author.bot) {
         modReplied = true;
+
+                 // Skip if moderator is using bot commands
+        const isBotTagged = m.mentions.users.has(botId) || m.content.includes(`<@${botId}>`) || m.content.includes(`<@!${botId}>`);                 if (isBotTagged) return false;
+                 if (isBotTagged) return false;
         collector.stop();
         return true;
+         
       }
       return false;
     }
