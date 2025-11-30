@@ -118,6 +118,7 @@ Use ONLY the KB context. No hallucination.
 Always output JSON:
 { "analysis": "...", "answer": "..." }
 Tone: short, clear, professional.
+Answer ONLY the current query. Do NOT address multiple related questions or create comprehensive answers. Each response should address the specific question asked.
 `;
 
     const userMsg = `
@@ -125,8 +126,6 @@ User Query: ${query}
 
 Topic: ${topic}
 
-Short-term memory: ${shortTerm}
-Long-term memory: ${longTerm}
 
 KB Context:
 ${kbContext}
