@@ -456,7 +456,7 @@ Toxic: ${tox.join(", ") || "none"}
     ------------------------------------------------------- */
     const finalText = await askFinalLLM(finalPrompt, model);
 
-    const response = await msg.channel.send(finalText);
+    const response = await msg.reply(finalText);
 
     /* -------------------------------------------------------
        ADD TO CACHE + CONTEXT + ANALYTICS + MEMORY
