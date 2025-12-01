@@ -121,7 +121,7 @@ export class RAGService {
     const ranked = this.rerankByTopic(docs, topic);
     const confidence = this.computeConfidence(ranked);
 
-    if (ranked.length === 0 || confidence < this.HALLUCINATION_THRESHOLD) { this.shouldClarify(query, confidence)
+    if ((ranked.length === 0 || confidence < this.HALLUCINATION_THRESHOLD) && !prevContext) { this.shouldClarify(query, confidence)
       await this.memory.addShortTerm(userId, `User: ${query}`);
       return {
         answer:
