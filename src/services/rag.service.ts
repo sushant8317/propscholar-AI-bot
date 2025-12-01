@@ -101,11 +101,8 @@ export class RAGService {
 
     const shortTerm = mem.shortTerm?.map((m: any) => m.text).join(" | ") || "none";
     const longTerm = mem.longTerm?.map((m: any) => m.text).join(" | ") || "none";
-      // Add conversation context for follow-up questions
-  const prevContext = mem.shortTerm?.slice(-2).map((m: any) => m.text).join(" | ") || "";
-  const contextAwareQuery = prevContext ? "Previous: " + prevContext + ". Current: " + query : query;
 
-    const expanded = this.expandQuery(contextAwareQuery).join(" ");
+    const expanded = this.expandQuery(query).join(" ");
     const queryEmbedding = await EmbedText(expanded);
 
     const raw = await this.vector.findSimilar(queryEmbedding, this.TOP_K, 0.18);
@@ -121,7 +118,7 @@ export class RAGService {
     const ranked = this.rerankByTopic(docs, topic);
     const confidence = this.computeConfidence(ranked);
 
-    if ((ranked.length === 0 || confidence < this.HALLUCINATION_THRESHOLD) && !prevContext) { this.shouldClarify(query, confidence)
+    if (ranked.length === 0 || confidence < this.HALLUCINATION_THRESHOLD) { this.shouldClarify(query, confidence)
       await this.memory.addShortTerm(userId, `User: ${query}`);
       return {
         answer:
