@@ -35,6 +35,11 @@ export class RAGService {
       ufm: ["unfair means", "unfair practices", "tick scalping", "signal trading", "copying signals", "exploitation"],
       drawdown: ["dd", "maximum loss", "loss limit", "risk limit", "overall drawdown"],
       rules: ["evaluation rules", "prop rules", "firm rules", "eligibility rules"]
+            win: ["pass", "clear", "succeed", "complete"],
+      fail: ["breach", "lose", "violate", "hit limit"],
+      stop: ["halt", "freeze", "locked", "unable to trade"],
+      money: ["gain", "earning", "return", "reward"],
+      withdraw: ["extract", "claim", "receive", "cash out"]
     };
 
     for (const key in synonyms) {
@@ -74,6 +79,23 @@ export class RAGService {
     }
   }
 
+   private shouldClarify(query: string, confidence: number): boolean {
+    const ambiguous = ["it", "that", "this", "here", "there"];
+    const isAmbiguous = ambiguous.some(word => query.toLowerCase().includes(word));
+    return isAmbiguous && confidence < 0.4;
+  }
+
+  private inferPossibleTopics(query: string): string[] {
+    const patterns: Record<string, string[]> = {
+      "phase": ["Phase 1", "Phase 2", "evaluation phases"],
+      "loss": ["daily loss limit", "overall loss limit", "stop out"],
+      "profit": ["profit target", "profitability requirement"]
+    };
+    return Object.entries(patterns)
+      .filter(([keyword]) => query.toLowerCase().includes(keyword))
+      .flatMap(([, topics]) => topics);
+  }
+
   async generateResponse(userId: string, query: string, topic: string) {
     const mem = await this.memory.getMemory(userId);
 
@@ -96,7 +118,7 @@ export class RAGService {
     const ranked = this.rerankByTopic(docs, topic);
     const confidence = this.computeConfidence(ranked);
 
-    if (ranked.length === 0 || confidence < this.HALLUCINATION_THRESHOLD) {
+    if (ranked.length === 0 || confidence < this.HALLUCINATION_THRESHOLD) { this.shouldClarify(query, confidence)
       await this.memory.addShortTerm(userId, `User: ${query}`);
       return {
         answer:
