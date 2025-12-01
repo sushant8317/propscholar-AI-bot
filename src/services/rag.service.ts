@@ -35,7 +35,7 @@ export class RAGService {
       ufm: ["unfair means", "unfair practices", "tick scalping", "signal trading", "copying signals", "exploitation"],
       drawdown: ["dd", "maximum loss", "loss limit", "risk limit", "overall drawdown"],
       rules: ["evaluation rules", "prop rules", "firm rules", "eligibility rules"],
-            win: ["pass", "clear", "succeed", "complete"],
+      win: ["pass", "clear", "succeed", "complete"],
       fail: ["breach", "lose", "violate", "hit limit"],
       stop: ["halt", "freeze", "locked", "unable to trade"],
       money: ["gain", "earning", "return", "reward"],
@@ -79,7 +79,7 @@ export class RAGService {
     }
   }
 
-   private shouldClarify(query: string, confidence: number): boolean {
+  private shouldClarify(query: string, confidence: number): boolean {
     const ambiguous = ["it", "that", "this", "here", "there"];
     const isAmbiguous = ambiguous.some(word => query.toLowerCase().includes(word));
     return isAmbiguous && confidence < 0.4;
@@ -96,13 +96,27 @@ export class RAGService {
       .flatMap(([, topics]) => topics);
   }
 
+  /**
+   * generateResponse
+   * - restores context-aware query building using short-term memory
+   * - expands the (possibly context-merged) query via expandQuery
+   * - keeps hallucination guard and confidence logic
+   */
   async generateResponse(userId: string, query: string, topic: string) {
     const mem = await this.memory.getMemory(userId);
 
-    const shortTerm = mem.shortTerm?.map((m: any) => m.text).join(" | ") || "none";
-    const longTerm = mem.longTerm?.map((m: any) => m.text).join(" | ") || "none";
+    // --- build previous conversation context (short term) if exists ---
+    const prevShort = Array.isArray(mem.shortTerm) ? mem.shortTerm.map((m: any) => m.text).join(" | ") : "";
+    const prevContext = prevShort ? `Previous conversation: ${prevShort}` : "";
 
-    const expanded = this.expandQuery(query).join(" ");
+    // If there's an explicit currentTopic stored in memory, prefer that
+    const currentTopic = mem.currentTopic || topic || "general";
+
+    // Build a context-aware query: if there is previous short-term memory, stitch it in
+    const contextAwareQuery = prevContext ? `${prevContext} | Current question: ${query}` : query;
+
+    // Expand the context-aware query (this adds synonyms etc)
+    const expanded = this.expandQuery(contextAwareQuery).join(" ");
     const queryEmbedding = await EmbedText(expanded);
 
     const raw = await this.vector.findSimilar(queryEmbedding, this.TOP_K, 0.18);
@@ -115,11 +129,23 @@ export class RAGService {
       score: r.score
     })) || [];
 
-    const ranked = this.rerankByTopic(docs, topic);
+    const ranked = this.rerankByTopic(docs, currentTopic);
     const confidence = this.computeConfidence(ranked);
 
-    if (ranked.length === 0 || confidence < this.HALLUCINATION_THRESHOLD) { this.shouldClarify(query, confidence)
+    // If nothing relevant, ask for clarification or hand off
+    if (ranked.length === 0 || confidence < this.HALLUCINATION_THRESHOLD) {
+      // store user query then return fallback
       await this.memory.addShortTerm(userId, `User: ${query}`);
+
+      // If the query is ambiguous, return a short clarification prompt
+      if (this.shouldClarify(query, confidence)) {
+        return {
+          answer: "Could you clarify what you mean by that? For example: 'Do you mean the daily drawdown rule or the maximum loss rule?'",
+          confidence,
+          usedDocs: []
+        };
+      }
+
       return {
         answer:
           "I don’t have much information regarding this. Let Harris or Sikha come in, they will reply in a better way sir. Until then please have patience.",
@@ -145,8 +171,8 @@ Answer ONLY the current query. Do NOT address multiple related questions or crea
 
     const userMsg = `
 User Query: ${query}
-Topic: ${topic}
-
+Context-Aware Query: ${contextAwareQuery}
+Topic: ${currentTopic}
 
 KB Context:
 ${kbContext}
@@ -178,6 +204,7 @@ ${kbContext}
       rawText ||
       "I don’t have much information regarding this. Let Harris or Sikha come in, they will reply in a better way sir. Until then please have patience.";
 
+    // save conversation in short term memory (user + bot)
     await this.memory.addShortTerm(userId, `User: ${query}`);
     await this.memory.addShortTerm(userId, `Bot: ${finalAnswer}`);
 
