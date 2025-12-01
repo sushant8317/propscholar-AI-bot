@@ -34,7 +34,7 @@ export class RAGService {
       payout: ["withdraw", "withdrawal", "payout schedule", "profit split", "payouts"],
       ufm: ["unfair means", "unfair practices", "tick scalping", "signal trading", "copying signals", "exploitation"],
       drawdown: ["dd", "maximum loss", "loss limit", "risk limit", "overall drawdown"],
-      rules: ["evaluation rules", "prop rules", "firm rules", "eligibility rules"]
+      rules: ["evaluation rules", "prop rules", "firm rules", "eligibility rules"],
             win: ["pass", "clear", "succeed", "complete"],
       fail: ["breach", "lose", "violate", "hit limit"],
       stop: ["halt", "freeze", "locked", "unable to trade"],
