@@ -101,6 +101,9 @@ export class RAGService {
 
     const shortTerm = mem.shortTerm?.map((m: any) => m.text).join(" | ") || "none";
     const longTerm = mem.longTerm?.map((m: any) => m.text).join(" | ") || "none";
+      // Add conversation context for follow-up questions
+  const prevContext = mem.shortTerm?.slice(-2).map((m: any) => m.text).join(" | ") || "";
+  const contextAwareQuery = prevContext ? "Previous: " + prevContext + ". Current: " + query : query;
 
     const expanded = this.expandQuery(contextAwareQuery).join(" ");
     const queryEmbedding = await EmbedText(expanded);
@@ -145,9 +148,6 @@ Answer ONLY the current query. Do NOT address multiple related questions or crea
 
     const userMsg = `
 User Query: ${query}
-  // Add conversation context for follow-up questions
-  const prevContext = mem.shortTerm?.slice(-2).map((m: any) => m.text).join(" | ") || "";
-  const contextAwareQuery = prevContext ? "Previous: " + prevContext + ". Current: " + query : query;
 Topic: ${topic}
 
 
