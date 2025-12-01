@@ -147,8 +147,7 @@ Answer ONLY the current query. Do NOT address multiple related questions or crea
 User Query: ${query}
   // Add conversation context for follow-up questions
   const prevContext = mem.shortTerm?.slice(-2).map((m: any) => m.text).join(" | ") || "";
-    const contextAwareQuery = prevContext ? `Previous: ${prevContext}. Current: ${query}` : query;
-
+  const contextAwareQuery = prevContext ? "Previous: " + prevContext + ". Current: " + query : query;
 Topic: ${topic}
 
 
