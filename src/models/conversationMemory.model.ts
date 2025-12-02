@@ -17,7 +17,6 @@ export const ConversationMemory = mongoose.model("ConversationMemory", Conversat
 
 export class ConversationMemoryService {
   
-  // Store message with role (user or assistant)
   async add(userId: string, role: "user" | "assistant", content: string) {
     let conv = await ConversationMemory.findOne({ userId });
 
@@ -28,17 +27,23 @@ export class ConversationMemoryService {
       });
     }
 
+    // Add new message
     conv.messages.push({ role, content });
 
-    // Keep last 10 messages (role + content)
+    // If more than 10 messages, keep only the last 10 in a type-safe way
     if (conv.messages.length > 10) {
-      conv.messages = conv.messages.slice(-10);
+      const lastTen = conv.messages.slice(-10); // JS array
+
+      // Clear Mongoose DocumentArray properly
+      conv.messages.splice(0, conv.messages.length);
+
+      // Push back messages safely into DocumentArray
+      lastTen.forEach(m => conv.messages.push(m));
     }
 
     return conv.save();
   }
 
-  // Retrieve full message history (last 10)
   async get(userId: string): Promise<{ role: string; content: string }[]> {
     const conv = await ConversationMemory.findOne({ userId });
     return conv ? conv.messages : [];
