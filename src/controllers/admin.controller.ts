@@ -166,7 +166,7 @@ router.post("/new", async (req: Request, res: Response) => {
   }
 });
 
-// UPDATE KB - with validation and audit logging
+// UPDATE KB
 router.post("/edit/:id", async (req: Request, res: Response) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -212,25 +212,21 @@ router.post("/edit/:id", async (req: Request, res: Response) => {
   }
 });
 
-// DELETE - MUST USE POST/DELETE, NEVER GET (PREVENTS ACCIDENTAL DELETION)
-// This is a critical security fix - GET should NEVER delete data
+// DELETE KB
 router.post("/delete/:id", async (req: Request, res: Response) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ error: "Invalid knowledge base ID" });
     }
     
-    // Fetch the document first (for audit log)
     const doc = await KnowledgeModel.findById(req.params.id);
     if (!doc) {
       logger.warn(`Attempted to delete non-existent KB: ${req.params.id}`);
       return res.status(404).json({ error: "Knowledge base not found" });
     }
     
-    // Create backup/audit record before deletion
     logger.info(`DELETING KB: ${req.params.id} | Title: ${doc.title} | Category: ${doc.category}`);
     
-    // Perform deletion
     await KnowledgeModel.findByIdAndDelete(req.params.id);
     
     logger.info(`Successfully deleted knowledge base: ${req.params.id}`);
@@ -250,7 +246,7 @@ router.post("/delete/:id", async (req: Request, res: Response) => {
   }
 });
 
-// DELETE via DELETE HTTP method (RESTful standard)
+// DELETE via DELETE method
 router.delete("/:id", async (req: Request, res: Response) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
@@ -274,7 +270,7 @@ router.delete("/:id", async (req: Request, res: Response) => {
   }
 });
 
-// BULK DELETE - with safety checks
+// BULK DELETE
 router.post("/bulk-delete", async (req: Request, res: Response) => {
   try {
     const { ids } = req.body;
@@ -287,18 +283,15 @@ router.post("/bulk-delete", async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Cannot delete more than 100 items at once" });
     }
     
-    // Validate all IDs
     if (!ids.every(id => mongoose.Types.ObjectId.isValid(id))) {
       return res.status(400).json({ error: "Invalid ID format" });
     }
     
-    // Get docs for audit log
     const docs = await KnowledgeModel.find({ _id: { $in: ids } }).lean();
     docs.forEach(doc => {
       logger.info(`BULK DELETE: ${doc._id} | Title: ${doc.title}`);
     });
     
-    // Perform deletion
     const result = await KnowledgeModel.deleteMany({ _id: { $in: ids } });
     
     logger.info(`Bulk deleted ${result.deletedCount} knowledge bases`);
@@ -318,14 +311,18 @@ router.post("/bulk-delete", async (req: Request, res: Response) => {
 router.get("/admin/health", async (req: Request, res: Response) => {
   try {
     const count = await KnowledgeModel.countDocuments();
-    const size = await KnowledgeModel.collection.stats();
-    
+
+    // 🔥 FIXED HERE — replaced .stats() with native MongoDB collStats
+    const size = await mongoose.connection.db.command({
+      collStats: KnowledgeModel.collection.name
+    });
+
     res.json({
       success: true,
       stats: {
         totalDocuments: count,
-        collectionSize: size.size,
-        averageDocSize: Math.round(size.size / Math.max(count, 1))
+        collectionSize: size.size || 0,
+        averageDocSize: Math.round((size.size || 1) / Math.max(count, 1))
       }
     });
   } catch (err) {
@@ -334,8 +331,7 @@ router.get("/admin/health", async (req: Request, res: Response) => {
   }
 });
 
-// LEGACY ROUTE - Removed GET /delete/:id to prevent accidental deletions
-// GET requests should NEVER perform destructive operations
+// LEGACY ROUTE
 router.get("/delete/:id", (req: Request, res: Response) => {
   logger.warn(`Attempted to use GET method for delete (deprecated): ${req.params.id}`);
   res.status(405).json({
