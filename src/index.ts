@@ -154,6 +154,12 @@ const rateLimit = new RateLimitService();
 const contextManager = new ContextService();
 
 /* -------------------------------------------------------
+   Conversation Memory Service (Option A)
+------------------------------------------------------- */
+import { ConversationMemoryService } from "./models/conversationMemory.model";
+const convMemory = new ConversationMemoryService();
+
+/* -------------------------------------------------------
    OPENAI
 ------------------------------------------------------- */
 
@@ -403,6 +409,20 @@ client.on("messageCreate", async (msg) => {
     const context = contextManager.get(userId);
 
     /* -------------------------------------------------------
+       LOAD CONVERSATION MEMORY (last 10 messages)
+    ------------------------------------------------------- */
+    let memoryBlock = "";
+    try {
+      const memoryHistory = await convMemory.get(userId);
+      memoryBlock = memoryHistory
+        .map(m => `${(m.role || "user").toString().toUpperCase()}: ${m.content}`)
+        .join("\n");
+    } catch (e) {
+      console.error("Memory load error:", e);
+      memoryBlock = "";
+    }
+
+    /* -------------------------------------------------------
        EXISTING PIPELINE (RAG + REWRITE + POLICIES)
     ------------------------------------------------------- */
     const topic = topics.detectTopic(userQuery);
@@ -426,7 +446,11 @@ client.on("messageCreate", async (msg) => {
     const model = chooseModel(userQuery, botTagged);
 
     const finalPrompt = `
-${context}
+Conversation Memory (last 10 messages):
+${memoryBlock || "(no memory)"}
+
+Context:
+${context || "(no context)"}
 
 User Query: ${userQuery}
 Rewritten: ${rewritten.answer}
@@ -467,8 +491,9 @@ Toxic: ${tox.join(", ") || "none"}
     });
 
     try {
-      await memory.addShortTerm(userId, `User: ${userQuery}`);
-      await memory.addShortTerm(userId, `Bot: ${finalText}`);
+      // Save structured conversation memory (user then assistant)
+      await convMemory.add(userId, "user", userQuery);
+      await convMemory.add(userId, "assistant", finalText);
     } catch (e) {
       console.error("MEMORY error:", e);
     }
