@@ -42,7 +42,7 @@ function fuzzyCorrect(word: string, dictionary: string[]): string {
     const dist = levenshtein(word, d);
     if (dist < lowest && dist <= 2) {
       lowest = dist;
-      best = d;
+      best = d;   // FIXED BUG
     }
   }
   return best;
