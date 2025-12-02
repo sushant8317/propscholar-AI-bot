@@ -340,33 +340,6 @@ client.on("messageCreate", async (msg) => {
     const raw = msg.content.trim();
     const userQuery = preprocess(raw);
 
-    /* -------------------------------------------------------
-       QUICK INTENT (kept)
-    ------------------------------------------------------- */
-    const intent = intentService.detectIntent(userQuery);
-    const quick = intentService.getQuickResponse(intent.intent);
-
-    if (quick && !botTagged) {
-      await msg.channel.send(quick);
-      return;
-    }
-
-    /* -------------------------------------------------------
-       CACHE CHECK (kept)
-    ------------------------------------------------------- */
-    const cached = cache.get(userQuery);
-    if (cached && !botTagged) {
-      await msg.channel.send(cached);
-      await analytics.log({
-        userId,
-        query: userQuery,
-        intent: intent.intent,
-        cached: true,
-        modelUsed: "cache",
-        responseTime: Date.now() - startTime
-      });
-      return;
-    }
 
     /* -------------------------------------------------------
        🎯 UNIFIED ADMIN-QUALITY BRAIN
