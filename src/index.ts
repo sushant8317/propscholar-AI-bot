@@ -1,3 +1,4 @@
+
 import express from "express";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
@@ -40,7 +41,8 @@ function fuzzyCorrect(word: string, dictionary: string[]): string {
   for (const d of dictionary) {
     const dist = levenshtein(word, d);
     if (dist < lowest && dist <= 2) {
-      lowest = d;
+      lowest = dist;
+      best = d;
     }
   }
   return best;
@@ -377,13 +379,8 @@ client.on("messageCreate", async (msg) => {
 
     let finalText = brainResp.answer || "Internal AI error.";
 
-    // OPTIONAL KB HIGHLIGHT
+    // OPTIONAL KB HIGHLIGHT (OFF - removed)
     let toSend = finalText;
-    if (brainResp.usedDocs && brainResp.usedDocs.length) {
-      toSend =
-        `**From Knowledge Base:** ${brainResp.usedDocs[0]?.metadata?.title || ""}\n\n` +
-        finalText;
-    }
 
     await msg.reply(toSend);
 
@@ -421,3 +418,4 @@ if (process.env.INGEST_ON_STARTUP === "true") {
     console.log("📥 KB Ingested")
   );
 }
+
