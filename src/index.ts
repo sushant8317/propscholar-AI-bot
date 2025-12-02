@@ -325,15 +325,6 @@ client.on("messageCreate", async (msg) => {
     return msg.reply("⏰ Please wait 10 seconds before asking another question!");
   }
 
-  if (rateCheck.shouldSummarize) {
-    await msg.channel.send(
-      `I notice you've asked several related questions:\n${rateCheck.prev
-        .map((q, i) => `${i + 1}. ${q}`)
-        .join("\n")}\n\nLet me provide a comprehensive answer...`
-    );
-    rateLimit.clear(userId);
-  }
-
   /* -------------------------------------------------------
      MODERATOR WAIT
   ------------------------------------------------------- */
