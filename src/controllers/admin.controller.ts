@@ -134,7 +134,7 @@ router.get("/:id", async (req: Request, res: Response) => {
   }
 });
 
-// CREATE NEW KB - with validation and data sanitization
+// CREATE NEW KB
 router.post("/new", async (req: Request, res: Response) => {
   try {
     const validation = validateKnowledgeBase(req.body);
@@ -312,8 +312,8 @@ router.get("/admin/health", async (req: Request, res: Response) => {
   try {
     const count = await KnowledgeModel.countDocuments();
 
-    // 🔥 FIXED HERE — replaced .stats() with native MongoDB collStats
-    const size = await mongoose.connection.db.command({
+    // 🔥 FIXED — added ! to guarantee db exists
+    const size = await mongoose.connection.db!.command({
       collStats: KnowledgeModel.collection.name
     });
 
