@@ -344,13 +344,13 @@ client.on("messageCreate", async (msg) => {
     /* -------------------------------------------------------
        🎯 UNIFIED ADMIN-QUALITY BRAIN
     ------------------------------------------------------- */
-    const brainResp = await BrainService.getAnswer(
-      userId,
-      userQuery,
-      { botTagged }
-    );
+const ragResp = await rag.generateResponse(
+              userId,
+              userQuery,
+              userQuery
+            );
 
-    let finalText = brainResp.answer || "Internal AI error.";
+    let finalText = ragResp.answer || "Internal AI error.";
 
     // OPTIONAL KB HIGHLIGHT (OFF - removed)
     let toSend = finalText;
