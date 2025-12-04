@@ -1,3 +1,4 @@
+237
 // src/services/rag.service.ts
 import OpenAI from "openai";
 import { VectorService } from "./vector.service";
@@ -223,7 +224,7 @@ export class RAGService {
       };
     }
     const kbContext = ranked
-      .slice(0, 8)
+      .slice(0, 1)
       .map((d) => `${d.metadata?.title || ""}\n${d.content}\n---\n`)
       .join("\n")
       .slice(0, 3500);
@@ -264,7 +265,7 @@ ${kbContext}
       return {
         answer: "I have already provided that answer earlier. Let Harris or Sikha provide more detail if needed.",
         confidence,
-        usedDocs: ranked.slice(0, 8)
+        usedDocs: ranked.slice(0, 1)
       };
     }
     await this.memory.addShortTerm(userId, `User: ${query}`);
@@ -272,7 +273,7 @@ ${kbContext}
     return {
       answer: finalAnswer,
       confidence,
-      usedDocs: ranked.slice(0, 8)
+      usedDocs: ranked.slice(0, 1)
     };
   }
 }
