@@ -172,7 +172,32 @@ export class RAGService {
   }
 
   // main function
-  async generateResponse(userId: string, query: string, topic: string) {
+  120
+  (userId: string, query: string, topic: string) {
+        // CRITICAL FIX: Validate KB exists before processing
+    try {
+      const kbCount = await (KnowledgeModel as any).countDocuments();
+      if (kbCount === 0) {
+        console.error("❌ NO KB DOCUMENTS FOUND - Admin panel KB is empty!");
+        return {
+          answer: "⚠️ Knowledge base not initialized. Please add training data in the admin panel first.",
+          confidence: 0,
+          usedDocs: []
+        };
+      }
+
+      const kbWithEmbeddings = await (KnowledgeModel as any).countDocuments({ 
+        embedding: { $exists: true, $type: "array", $ne: [] }
+      });
+      
+      if (kbWithEmbeddings < 3) {
+        console.warn(`⚠️ LOW KB EMBEDDINGS: Only ${kbWithEmbeddings} docs with valid embeddings!`);
+      }
+    } catch (err: any) {
+      console.error("KB validation error:", err?.message);
+    }
+
+
     // fetch memory
     const mem = await this.memory.getMemory(userId);
 
